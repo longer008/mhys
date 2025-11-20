@@ -1,65 +1,88 @@
-import Image from "next/image";
+"use client";
+
+import { useState } from "react";
+import DivinationForm from "@/components/DivinationForm";
+import HexagramDisplay from "@/components/HexagramDisplay";
+import SettingsDialog from "@/components/SettingsDialog";
+import { calculateHexagrams, DivinationResult } from "@/lib/meihua";
 
 export default function Home() {
+  const [showResult, setShowResult] = useState(false);
+  const [result, setResult] = useState<DivinationResult | null>(null);
+  const [question, setQuestion] = useState("");
+
+  const handleDivinationComplete = (num1: number, num2: number, q: string) => {
+    const hexagrams = calculateHexagrams(num1, num2);
+    setResult(hexagrams);
+    setQuestion(q);
+    setShowResult(true);
+  };
+
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+    <main className="min-h-screen flex flex-col items-center justify-center p-6 md:p-12 relative overflow-hidden selection:bg-stone-200 selection:text-stone-900">
+      <SettingsDialog />
+
+      {/* Decorative Background Elements */}
+      <div className="absolute inset-0 z-0 pointer-events-none overflow-hidden">
+        {/* Subtle Ink Wash Circles */}
+        <div className="absolute top-[-10%] left-1/2 -translate-x-1/2 w-[1000px] h-[1000px] bg-stone-100/40 rounded-full blur-[100px]" />
+        <div className="absolute bottom-[-10%] right-[-10%] w-[800px] h-[800px] bg-stone-100/30 rounded-full blur-[80px]" />
+
+        {/* Vertical Chinese Text Decoration (Optional, subtle) */}
+        <div className="absolute top-24 right-12 text-[10rem] font-song text-stone-50 opacity-[0.03] select-none writing-vertical-rl">
+          梅花易数
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+      </div>
+
+      <div className="relative z-10 w-full max-w-4xl flex flex-col items-center gap-16">
+        {/* Hero Section */}
+        <div className={`text-center space-y-8 transition-all duration-1000 ease-out ${showResult ? 'scale-75 -translate-y-12 opacity-80' : 'opacity-100'}`}>
+          <div className="relative inline-block">
+            <h1 className="text-6xl md:text-8xl font-song font-bold text-stone-800 tracking-widest relative z-10">
+              梅花易数
+            </h1>
+            {/* Red Seal Decoration */}
+            <div className="absolute -top-4 -right-8 w-16 h-16 border-4 border-red-800/20 rounded-sm rotate-12 flex items-center justify-center opacity-60">
+              <span className="text-red-900/30 font-serif text-xs">观象</span>
+            </div>
+          </div>
+
+          <div className="flex flex-col items-center gap-4">
+            <div className="h-[1px] w-24 bg-gradient-to-r from-transparent via-stone-300 to-transparent" />
+            <p className="text-lg md:text-xl text-stone-500 max-w-xl mx-auto font-kai leading-loose tracking-wide">
+              万物皆有数，数中藏玄机。<br />
+              <span className="text-stone-400 text-base">观物取象 · 以象定数 · 洞悉天机</span>
+            </p>
+            <div className="h-[1px] w-24 bg-gradient-to-r from-transparent via-stone-300 to-transparent" />
+          </div>
         </div>
-      </main>
-    </div>
+
+        {/* Interactive Section */}
+        <div className="w-full flex flex-col items-center justify-center min-h-[400px]">
+          {!showResult ? (
+            <div className="w-full max-w-md animate-in fade-in slide-in-from-bottom-8 duration-1000 fill-mode-both">
+              <DivinationForm onComplete={handleDivinationComplete} />
+            </div>
+          ) : (
+            <div className="w-full animate-in fade-in slide-in-from-bottom-12 duration-1000 fill-mode-both">
+              {result && <HexagramDisplay result={result} question={question} />}
+              <div className="text-center mt-12">
+                <button
+                  onClick={() => setShowResult(false)}
+                  className="group relative px-8 py-3 overflow-hidden rounded-full bg-transparent text-stone-600 transition-all duration-300 hover:text-stone-900"
+                >
+                  <span className="absolute inset-0 w-full h-full bg-stone-100/50 scale-x-0 group-hover:scale-x-100 transition-transform duration-500 origin-left rounded-full" />
+                  <span className="relative font-song text-lg tracking-widest">重新起卦</span>
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      <footer className="absolute bottom-6 text-stone-300 text-xs font-song tracking-[0.2em]">
+        © 2025 梅花易数 · 观象授时
+      </footer>
+    </main>
   );
 }

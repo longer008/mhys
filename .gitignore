@@ -32,6 +32,7 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env*
+!.env.example
 
 # vercel
 .vercel
@@ -39,3 +40,17 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# 临时文档和说明文件
+DEPLOY_ZH.md
+DEPLOYMENT_CHECKLIST.md
+快速开始.md
+部署文件说明.md
+✅ 部署准备完成.md
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
