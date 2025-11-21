@@ -32,7 +32,7 @@ function Trigram({ lines, name, position }: HexagramProps) {
     );
 }
 
-export default function HexagramDisplay({ result, question, onReset }: { result: DivinationResult; question: string; onReset: () => void }) {
+export default function HexagramDisplay({ result, question, onReset, onInterpretationComplete }: { result: DivinationResult; question: string; onReset: () => void; onInterpretationComplete?: (interpretation: string) => void }) {
     const [interpretation, setInterpretation] = useState("");
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState("");
@@ -85,12 +85,18 @@ export default function HexagramDisplay({ result, question, onReset }: { result:
             const reader = response.body.getReader();
             const decoder = new TextDecoder();
             let done = false;
+            let fullInterpretation = "";
 
             while (!done) {
                 const { value, done: doneReading } = await reader.read();
                 done = doneReading;
                 const chunkValue = decoder.decode(value);
                 setInterpretation((prev) => prev + chunkValue);
+                fullInterpretation += chunkValue;
+            }
+
+            if (onInterpretationComplete) {
+                onInterpretationComplete(fullInterpretation);
             }
 
         } catch (err: any) {
@@ -183,7 +189,7 @@ export default function HexagramDisplay({ result, question, onReset }: { result:
                             className="flex items-center gap-2 px-8 py-3 bg-stone-800 hover:bg-stone-700 text-white rounded-full shadow-lg hover:shadow-stone-800/20 transition-all duration-300 group animate-in fade-in slide-in-from-bottom-4 duration-700 delay-700 fill-mode-both"
                         >
                             <Sparkles className="w-4 h-4 group-hover:animate-pulse" />
-                            <span>毛毛狐解卦</span>
+                            <span>解卦</span>
                         </button>
                         <button
                             onClick={onReset}

@@ -5,11 +5,21 @@ import DivinationForm from "@/components/DivinationForm";
 import HexagramDisplay from "@/components/HexagramDisplay";
 import SettingsDialog from "@/components/SettingsDialog";
 import { calculateHexagrams, DivinationResult } from "@/lib/meihua";
+import { HistoryDialog } from "@/components/HistoryDialog";
+import { saveRecord } from "@/lib/history";
+import { History as HistoryIcon } from "lucide-react";
 
 export default function Home() {
   const [showResult, setShowResult] = useState(false);
   const [result, setResult] = useState<DivinationResult | null>(null);
   const [question, setQuestion] = useState("");
+  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
+
+  const handleInterpretationComplete = (interpretation: string) => {
+    if (result && question) {
+      saveRecord(question, result, interpretation);
+    }
+  };
 
   const handleDivinationComplete = (num1: number, num2: number, num3: number, q: string) => {
     const hexagrams = calculateHexagrams(num1, num2, num3);
@@ -21,6 +31,14 @@ export default function Home() {
   return (
     <main className="min-h-screen flex flex-col items-center justify-center p-6 md:p-12 relative overflow-hidden selection:bg-stone-200 selection:text-stone-900">
       <SettingsDialog />
+      <button
+        onClick={() => setIsHistoryOpen(true)}
+        className="fixed top-4 right-16 p-2 text-stone-400 hover:text-stone-600 transition-colors z-50"
+        title="历史记录"
+      >
+        <HistoryIcon className="w-6 h-6" />
+      </button>
+      <HistoryDialog open={isHistoryOpen} onOpenChange={setIsHistoryOpen} />
 
       {/* Decorative Background Elements */}
       <div className="absolute inset-0 z-0 pointer-events-none overflow-hidden">
@@ -68,7 +86,7 @@ export default function Home() {
             </div>
           ) : (
             <div className="w-full animate-in fade-in slide-in-from-bottom-12 duration-1000 fill-mode-both">
-              {result && <HexagramDisplay result={result} question={question} onReset={() => setShowResult(false)} />}
+              {result && <HexagramDisplay result={result} question={question} onReset={() => setShowResult(false)} onInterpretationComplete={handleInterpretationComplete} />}
             </div>
           )}
         </div>
