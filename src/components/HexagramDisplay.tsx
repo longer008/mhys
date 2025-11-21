@@ -51,8 +51,8 @@ export default function HexagramDisplay({ result, question, onReset, onInterpret
 
     const handleInterpret = async () => {
         const apiKey = localStorage.getItem("meihua_api_key");
-        const baseUrl = localStorage.getItem("meihua_api_base_url") || "https://api.openai.com/v1";
-        const model = localStorage.getItem("meihua_api_model") || "gpt-3.5-turbo";
+        const baseUrl = localStorage.getItem("meihua_api_base_url") || "";
+        const model = localStorage.getItem("meihua_api_model") || "";
 
         // Client-side key is optional now, server might have env vars
         // if (!apiKey) {
