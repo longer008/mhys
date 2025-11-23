@@ -55,7 +55,7 @@ export default function LoadingScreen({ onComplete }: LoadingScreenProps) {
 
   return (
     <motion.div
-      className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-[#fafaf9] overflow-hidden"
+      className="fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-[#fafaf9] overflow-hidden"
       initial={{ opacity: 1 }}
       exit={{ opacity: 0, transition: { duration: 0.8, ease: "easeInOut" } }}
     >

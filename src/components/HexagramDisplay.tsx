@@ -104,7 +104,7 @@ export default function HexagramDisplay({ result, question, onReset, onInterpret
     };
 
     return (
-        <div className="w-full max-w-4xl mx-auto mt-0 space-y-1 animate-in fade-in duration-700">
+        <div className="w-full max-w-4xl mx-auto space-y-6 animate-in fade-in duration-700">
             <InterpretationModal
                 open={isModalOpen}
                 onOpenChange={setIsModalOpen}
@@ -186,7 +186,7 @@ export default function HexagramDisplay({ result, question, onReset, onInterpret
             </div>
 
             {/* Action Buttons */}
-            <div className="flex flex-col items-center gap-4 mt-12">
+            <div className="flex flex-col items-center gap-4 mt-6 md:mt-12">
                 <div className="flex items-center gap-4">
                     <button
                         onClick={handleInterpret}
