@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { AnimatePresence } from "framer-motion";
 import DivinationForm from "@/components/DivinationForm";
 import HexagramDisplay from "@/components/HexagramDisplay";
 import SettingsDialog from "@/components/SettingsDialog";
@@ -8,12 +9,26 @@ import { calculateHexagrams, DivinationResult } from "@/lib/meihua";
 import { HistoryDialog } from "@/components/HistoryDialog";
 import { saveRecord } from "@/lib/history";
 import { History as HistoryIcon } from "lucide-react";
+import LoadingScreen from "@/components/LoadingScreen";
 
 export default function Home() {
+  const [isLoading, setIsLoading] = useState(true);
   const [showResult, setShowResult] = useState(false);
   const [result, setResult] = useState<DivinationResult | null>(null);
   const [question, setQuestion] = useState("");
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
+
+  // Prevent scrolling during loading
+  useEffect(() => {
+    if (isLoading) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "";
+    }
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [isLoading]);
 
   const handleInterpretationComplete = (interpretation: string) => {
     if (result && question) {
@@ -30,6 +45,12 @@ export default function Home() {
 
   return (
     <main className="flex-1 h-full flex flex-col items-center justify-center p-4 relative overflow-hidden selection:bg-stone-200 selection:text-stone-900">
+      <AnimatePresence mode="wait">
+        {isLoading && (
+          <LoadingScreen key="loading" onComplete={() => setIsLoading(false)} />
+        )}
+      </AnimatePresence>
+
       <SettingsDialog />
       <button
         onClick={() => setIsHistoryOpen(true)}
