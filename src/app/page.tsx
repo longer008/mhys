@@ -32,7 +32,7 @@ export default function Home() {
   };
 
   return (
-    <main className="flex-1 w-full flex flex-col items-center justify-start py-8 p-4 relative selection:bg-stone-200 selection:text-stone-900 overflow-y-auto">
+    <main className="flex-1 w-full flex flex-col items-center justify-start pt-24 pb-4 p-4 relative selection:bg-stone-200 selection:text-stone-900 overflow-y-auto">
       {/* Loading Screen - Highest Priority */}
       <AnimatePresence mode="wait">
         {isLoading && (
@@ -94,7 +94,7 @@ export default function Home() {
             {/* Interactive Section */}
             <div className="w-full flex flex-col items-center justify-center min-h-[400px]">
               {!showResult ? (
-                <div className="w-full max-w-md animate-in fade-in slide-in-from-bottom-8 duration-1000 fill-mode-both">
+                <div className="w-full max-w-md animate-in fade-in slide-in-from-bottom-8 duration-1000 fill-mode-both scale-95">
                   <DivinationForm onComplete={handleDivinationComplete} />
                 </div>
               ) : (
