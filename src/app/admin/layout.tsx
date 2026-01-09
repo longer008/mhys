@@ -18,7 +18,8 @@ export default function AdminLayout({
 
     useEffect(() => {
         checkAuth();
-    }, [pathname]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
     const checkAuth = async () => {
         try {

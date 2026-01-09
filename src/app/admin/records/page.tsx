@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
+import useSWR from 'swr';
 import { Search, Trash2, ChevronLeft, ChevronRight, Eye } from 'lucide-react';
 
 interface Record {
@@ -23,39 +24,24 @@ interface RecordsResponse {
     totalPages: number;
 }
 
+const fetcher = (url: string) => fetch(url).then(res => res.json());
+
 export default function AdminRecordsPage() {
-    const [data, setData] = useState<RecordsResponse | null>(null);
-    const [loading, setLoading] = useState(true);
     const [search, setSearch] = useState('');
+    const [searchQuery, setSearchQuery] = useState('');
     const [page, setPage] = useState(1);
     const [selectedRecord, setSelectedRecord] = useState<Record | null>(null);
 
-    useEffect(() => {
-        fetchRecords();
-    }, [page, search]);
+    const apiUrl = `/api/admin/records?page=${page}&pageSize=20${searchQuery ? `&search=${encodeURIComponent(searchQuery)}` : ''}`;
 
-    const fetchRecords = async () => {
-        setLoading(true);
-        try {
-            const params = new URLSearchParams({
-                page: page.toString(),
-                pageSize: '20',
-            });
-            if (search) {
-                params.set('search', search);
-            }
-
-            const res = await fetch(`/api/admin/records?${params}`);
-            if (res.ok) {
-                const data = await res.json();
-                setData(data);
-            }
-        } catch (error) {
-            console.error('Failed to fetch records:', error);
-        } finally {
-            setLoading(false);
+    const { data, isLoading, mutate } = useSWR<RecordsResponse>(
+        apiUrl,
+        fetcher,
+        {
+            revalidateOnFocus: false,
+            dedupingInterval: 10000,
         }
-    };
+    );
 
     const handleDelete = async (id: string) => {
         if (!confirm('确定要删除这条记录吗？')) return;
@@ -68,7 +54,7 @@ export default function AdminRecordsPage() {
             });
 
             if (res.ok) {
-                fetchRecords();
+                mutate(); // 重新获取数据
             }
         } catch (error) {
             console.error('Failed to delete record:', error);
@@ -78,7 +64,7 @@ export default function AdminRecordsPage() {
     const handleSearch = (e: React.FormEvent) => {
         e.preventDefault();
         setPage(1);
-        fetchRecords();
+        setSearchQuery(search);
     };
 
     const formatDate = (dateStr: string) => {
@@ -155,7 +141,7 @@ export default function AdminRecordsPage() {
 
             {/* 记录列表 */}
             <div className="bg-white rounded-xl shadow-sm border border-stone-200 overflow-hidden">
-                {loading ? (
+                {isLoading ? (
                     <div className="p-8 text-center text-stone-500">加载中...</div>
                 ) : data?.records.length === 0 ? (
                     <div className="p-8 text-center text-stone-500">暂无记录</div>

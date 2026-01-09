@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import useSWR from 'swr';
 import { Users, FileText, Calendar, TrendingUp } from 'lucide-react';
 
 interface Stats {
@@ -10,27 +10,15 @@ interface Stats {
     enabled: boolean;
 }
 
+const fetcher = (url: string) => fetch(url).then(res => res.json());
+
 export default function AdminDashboard() {
-    const [stats, setStats] = useState<Stats | null>(null);
-    const [loading, setLoading] = useState(true);
+    const { data: stats, isLoading } = useSWR<Stats>('/api/stats', fetcher, {
+        revalidateOnFocus: false,
+        dedupingInterval: 30000, // 30秒内不重复请求
+    });
 
-    useEffect(() => {
-        fetchStats();
-    }, []);
-
-    const fetchStats = async () => {
-        try {
-            const res = await fetch('/api/stats');
-            const data = await res.json();
-            setStats(data);
-        } catch (error) {
-            console.error('Failed to fetch stats:', error);
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    if (loading) {
+    if (isLoading) {
         return (
             <div className="flex items-center justify-center h-64">
                 <div className="text-stone-500">加载中...</div>

@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
+import useSWR from 'swr';
 import { Save, RefreshCw } from 'lucide-react';
 
 interface Settings {
@@ -8,32 +9,24 @@ interface Settings {
     siteTitle: string;
 }
 
+const fetcher = (url: string) => fetch(url).then(res => res.json());
+
 export default function AdminSettingsPage() {
-    const [settings, setSettings] = useState<Settings>({
-        requireLogin: false,
-        siteTitle: '梅花易数',
-    });
-    const [loading, setLoading] = useState(true);
+    const { data: initialSettings, isLoading, mutate } = useSWR<Settings>(
+        '/api/admin/settings',
+        fetcher,
+        {
+            revalidateOnFocus: false,
+            dedupingInterval: 30000,
+        }
+    );
+
+    const [settings, setSettings] = useState<Settings | null>(null);
     const [saving, setSaving] = useState(false);
     const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
-    useEffect(() => {
-        fetchSettings();
-    }, []);
-
-    const fetchSettings = async () => {
-        try {
-            const res = await fetch('/api/admin/settings');
-            if (res.ok) {
-                const data = await res.json();
-                setSettings(data);
-            }
-        } catch (error) {
-            console.error('Failed to fetch settings:', error);
-        } finally {
-            setLoading(false);
-        }
-    };
+    // 当数据加载完成后，初始化本地状态
+    const currentSettings = settings ?? initialSettings ?? { requireLogin: false, siteTitle: '梅花易数' };
 
     const handleSave = async () => {
         setSaving(true);
@@ -43,22 +36,27 @@ export default function AdminSettingsPage() {
             const res = await fetch('/api/admin/settings', {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(settings),
+                body: JSON.stringify(currentSettings),
             });
 
             if (res.ok) {
                 setMessage({ type: 'success', text: '设置已保存' });
+                mutate(currentSettings); // 更新缓存
             } else {
                 setMessage({ type: 'error', text: '保存失败' });
             }
-        } catch (error) {
+        } catch {
             setMessage({ type: 'error', text: '网络错误' });
         } finally {
             setSaving(false);
         }
     };
 
-    if (loading) {
+    const updateSettings = (updates: Partial<Settings>) => {
+        setSettings({ ...currentSettings, ...updates });
+    };
+
+    if (isLoading) {
         return (
             <div className="flex items-center justify-center h-64">
                 <div className="text-stone-500">加载中...</div>
@@ -81,8 +79,8 @@ export default function AdminSettingsPage() {
                     </label>
                     <input
                         type="text"
-                        value={settings.siteTitle}
-                        onChange={(e) => setSettings({ ...settings, siteTitle: e.target.value })}
+                        value={currentSettings.siteTitle}
+                        onChange={(e) => updateSettings({ siteTitle: e.target.value })}
                         className="w-full max-w-md px-4 py-2 border border-stone-300 rounded-lg focus:ring-2 focus:ring-stone-500 focus:border-transparent outline-none"
                     />
                     <p className="mt-1 text-sm text-stone-500">显示在浏览器标签页的标题</p>
@@ -100,12 +98,12 @@ export default function AdminSettingsPage() {
                             </p>
                         </div>
                         <button
-                            onClick={() => setSettings({ ...settings, requireLogin: !settings.requireLogin })}
-                            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${settings.requireLogin ? 'bg-stone-800' : 'bg-stone-300'
+                            onClick={() => updateSettings({ requireLogin: !currentSettings.requireLogin })}
+                            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${currentSettings.requireLogin ? 'bg-stone-800' : 'bg-stone-300'
                                 }`}
                         >
                             <span
-                                className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${settings.requireLogin ? 'translate-x-6' : 'translate-x-1'
+                                className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${currentSettings.requireLogin ? 'translate-x-6' : 'translate-x-1'
                                     }`}
                             />
                         </button>
@@ -116,8 +114,8 @@ export default function AdminSettingsPage() {
                 {message && (
                     <div
                         className={`p-3 rounded-lg text-sm ${message.type === 'success'
-                                ? 'bg-green-50 text-green-600 border border-green-200'
-                                : 'bg-red-50 text-red-600 border border-red-200'
+                            ? 'bg-green-50 text-green-600 border border-green-200'
+                            : 'bg-red-50 text-red-600 border border-red-200'
                             }`}
                     >
                         {message.text}
