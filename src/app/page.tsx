@@ -94,7 +94,7 @@ export default function Home() {
             {/* Interactive Section */}
             <div className="w-full flex flex-col items-center justify-center min-h-[400px]">
               {!showResult ? (
-                <div className="w-full max-w-md animate-in fade-in slide-in-from-bottom-8 duration-1000 fill-mode-both scale-95">
+                <div className="w-full max-w-md animate-in fade-in slide-in-from-bottom-8 duration-1000 fill-mode-both">
                   <DivinationForm onComplete={handleDivinationComplete} />
                 </div>
               ) : (

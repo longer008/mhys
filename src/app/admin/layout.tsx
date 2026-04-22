@@ -22,8 +22,11 @@ export default function AdminLayout({
     }, []);
 
     const checkAuth = async () => {
+
         try {
-            const res = await fetch('/api/admin/auth');
+            const res = await fetch('/api/admin/auth', {
+                cache: 'no-store',
+            });
             const data = await res.json();
             setDbEnabled(data.dbEnabled);
             setIsAuthenticated(data.authenticated);
@@ -33,6 +36,8 @@ export default function AdminLayout({
                 router.replace('/not-found');
             } else if (!data.authenticated && pathname !== '/admin/login') {
                 router.replace('/admin/login');
+            } else if (data.authenticated && pathname === '/admin/login') {
+                router.replace('/admin');
             }
         } catch (error) {
             console.error('Auth check failed:', error);
@@ -143,3 +148,4 @@ export default function AdminLayout({
         </div>
     );
 }
+

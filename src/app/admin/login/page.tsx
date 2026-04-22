@@ -1,11 +1,10 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { Lock, Eye, EyeOff } from 'lucide-react';
 
 export default function AdminLoginPage() {
-    const router = useRouter();
     const [password, setPassword] = useState('');
     const [showPassword, setShowPassword] = useState(false);
     const [error, setError] = useState('');
@@ -30,8 +29,8 @@ export default function AdminLoginPage() {
                 return;
             }
 
-            router.replace('/admin');
-        } catch (err) {
+            window.location.replace('/admin');
+        } catch {
             setError('网络错误，请重试');
         } finally {
             setLoading(false);
@@ -90,15 +89,15 @@ export default function AdminLoginPage() {
                     </form>
 
                     <div className="mt-6 text-center">
-                        <a
-                            href="/"
+                        <Link href="/"
                             className="text-sm text-stone-500 hover:text-stone-700 transition-colors"
                         >
                             ← 返回首页
-                        </a>
+                        </Link>
                     </div>
                 </div>
             </div>
         </div>
     );
 }
+
