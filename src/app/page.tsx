@@ -5,7 +5,7 @@ import { AnimatePresence } from "framer-motion";
 import DivinationForm from "@/components/DivinationForm";
 import HexagramDisplay from "@/components/HexagramDisplay";
 import SettingsDialog from "@/components/SettingsDialog";
-import { calculateHexagrams, DivinationResult } from "@/lib/meihua";
+import { calculateHexagrams, type DivinationMethod, type DivinationResult } from "@/lib/meihua";
 import { HistoryDialog } from "@/components/HistoryDialog";
 import { saveRecord } from "@/lib/history";
 import { History as HistoryIcon } from "lucide-react";
@@ -24,8 +24,8 @@ export default function Home() {
     }
   };
 
-  const handleDivinationComplete = (num1: number, num2: number, num3: number, q: string, movingLine?: number) => {
-    const hexagrams = calculateHexagrams(num1, num2, num3, movingLine);
+  const handleDivinationComplete = (num1: number, num2: number, num3: number, q: string, movingLine?: number, method: DivinationMethod = "manual", generatedAt: Date = new Date()) => {
+    const hexagrams = calculateHexagrams(num1, num2, num3, movingLine, method, generatedAt);
     setResult(hexagrams);
     setQuestion(q);
     setShowResult(true);

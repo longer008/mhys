@@ -1,4 +1,4 @@
-import { DivinationResult } from './meihua';
+import type { DivinationResult } from './meihua';
 import { getUserId } from './user';
 
 export interface DivinationRecord {

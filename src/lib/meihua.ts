@@ -23,6 +23,42 @@ export type DivinationResult = {
     yongTrigram: Trigram; // Function/Object
     tiWuxing: string;
     yongWuxing: string;
+    wuxingRelation?: WuxingRelation;
+    meta?: DivinationMeta;
+};
+
+export type DivinationMethod = "manual" | "random" | "time";
+
+export type DivinationMeta = {
+    method: DivinationMethod;
+    generatedAt: string;
+    timeZone: string;
+    timeText: string;
+    rawNumbers: {
+        num1: number;
+        num2: number;
+        num3: number;
+        movingLine?: number;
+    };
+    lunar: {
+        month: number;
+        day: number;
+        season: string;
+        seasonRule: string;
+        yearGanZhi?: string;
+        monthGanZhi?: string;
+        dayGanZhi?: string;
+        timeGanZhi?: string;
+    };
+};
+
+export type WuxingRelation = {
+    type: "yong-sheng-ti" | "bihe" | "ti-ke-yong" | "ti-sheng-yong" | "yong-ke-ti";
+    label: string;
+    judgment: "大吉" | "吉" | "小吉" | "凶" | "大凶";
+    description: string;
+    tiWuxing: string;
+    yongWuxing: string;
 };
 
 const TRIGRAMS: Record<number, Trigram> = {
@@ -54,7 +90,140 @@ function getTrigramFromLines(lines: boolean[]): Trigram {
     return TRIGRAMS[8]; // Fallback
 }
 
-export function calculateHexagrams(num1: number, num2: number, num3: number, movingLineIndex?: number): DivinationResult {
+function getLunarSeason(month: number): string {
+    if (month >= 1 && month <= 3) return "春";
+    if (month >= 4 && month <= 6) return "夏";
+    if (month >= 7 && month <= 9) return "秋";
+    if (month >= 10 && month <= 12) return "冬";
+    return "未知";
+}
+
+function getTimeText(date: Date): string {
+    return date.toLocaleString("zh-CN", {
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
+        hour12: false,
+    });
+}
+
+function buildDivinationMeta(
+    method: DivinationMethod,
+    num1: number,
+    num2: number,
+    num3: number,
+    movingLine: number,
+    generatedAt: Date
+): DivinationMeta {
+    const lunar = Lunar.fromDate(generatedAt);
+    const lunarMonth = lunar.getMonth();
+    const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || "local";
+
+    return {
+        method,
+        generatedAt: generatedAt.toISOString(),
+        timeZone,
+        timeText: getTimeText(generatedAt),
+        rawNumbers: {
+            num1,
+            num2,
+            num3,
+            movingLine,
+        },
+        lunar: {
+            month: lunarMonth,
+            day: lunar.getDay(),
+            season: getLunarSeason(lunarMonth),
+            seasonRule: "农历1-3春、4-6夏、7-9秋、10-12冬",
+            yearGanZhi: lunar.getYearInGanZhi(),
+            monthGanZhi: lunar.getMonthInGanZhi(),
+            dayGanZhi: lunar.getDayInGanZhi(),
+            timeGanZhi: lunar.getTimeInGanZhi(),
+        },
+    };
+}
+
+function calculateWuxingRelation(tiWuxing: string, yongWuxing: string): WuxingRelation {
+    const generates: Record<string, string> = {
+        木: "火",
+        火: "土",
+        土: "金",
+        金: "水",
+        水: "木",
+    };
+    const controls: Record<string, string> = {
+        木: "土",
+        土: "水",
+        水: "火",
+        火: "金",
+        金: "木",
+    };
+
+    if (tiWuxing === yongWuxing) {
+        return {
+            type: "bihe",
+            label: "体用比和",
+            judgment: "吉",
+            description: "体用比和吉",
+            tiWuxing,
+            yongWuxing,
+        };
+    }
+
+    if (generates[yongWuxing] === tiWuxing) {
+        return {
+            type: "yong-sheng-ti",
+            label: "用生体",
+            judgment: "大吉",
+            description: "用生体大吉",
+            tiWuxing,
+            yongWuxing,
+        };
+    }
+
+    if (controls[tiWuxing] === yongWuxing) {
+        return {
+            type: "ti-ke-yong",
+            label: "体克用",
+            judgment: "小吉",
+            description: "体克用小吉",
+            tiWuxing,
+            yongWuxing,
+        };
+    }
+
+    if (generates[tiWuxing] === yongWuxing) {
+        return {
+            type: "ti-sheng-yong",
+            label: "体生用",
+            judgment: "凶",
+            description: "体生用凶",
+            tiWuxing,
+            yongWuxing,
+        };
+    }
+
+    return {
+        type: "yong-ke-ti",
+        label: "用克体",
+        judgment: "大凶",
+        description: "用克体大凶",
+        tiWuxing,
+        yongWuxing,
+    };
+}
+
+export function calculateHexagrams(
+    num1: number,
+    num2: number,
+    num3: number,
+    movingLineIndex?: number,
+    method: DivinationMethod = "manual",
+    generatedAt: Date = new Date()
+): DivinationResult {
     // 1. Calculate Main Hexagram (本卦)
     const upperNum = num1;
     const lowerNum = num2;
@@ -120,6 +289,8 @@ export function calculateHexagrams(num1: number, num2: number, num3: number, mov
         yongTrigram = upperTrigram;
     }
 
+    const wuxingRelation = calculateWuxingRelation(tiTrigram.wuxing, yongTrigram.wuxing);
+
     return {
         main: mainHexagram,
         mutual: mutualHexagram,
@@ -129,10 +300,12 @@ export function calculateHexagrams(num1: number, num2: number, num3: number, mov
         yongTrigram,
         tiWuxing: tiTrigram.wuxing,
         yongWuxing: yongTrigram.wuxing,
+        wuxingRelation,
+        meta: buildDivinationMeta(method, num1, num2, num3, movingLine, generatedAt),
     };
 }
 
-export function generateTimeBasedNumbers(): { num1: number; num2: number; num3: number; movingLine: number } {
+export function generateTimeBasedNumbers(): { num1: number; num2: number; num3: number; movingLine: number; generatedAt: Date } {
     const now = new Date();
     const lunar = Lunar.fromDate(now);
 
@@ -165,5 +338,5 @@ export function generateTimeBasedNumbers(): { num1: number; num2: number; num3: 
 
     // num3 is returned as timeZhi just for display/reference, 
     // but the actual calculation should rely on the explicit 'movingLine' we return.
-    return { num1, num2, num3: timeZhi, movingLine };
+    return { num1, num2, num3: timeZhi, movingLine, generatedAt: now };
 }

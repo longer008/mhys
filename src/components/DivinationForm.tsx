@@ -8,9 +8,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
+import type { DivinationMethod } from "@/lib/meihua";
 
 interface DivinationFormProps {
-    onComplete: (num1: number, num2: number, num3: number, question: string, movingLine?: number) => void;
+    onComplete: (num1: number, num2: number, num3: number, question: string, movingLine?: number, method?: DivinationMethod, generatedAt?: Date) => void;
 }
 
 export default function DivinationForm({ onComplete }: DivinationFormProps) {
@@ -21,13 +22,13 @@ export default function DivinationForm({ onComplete }: DivinationFormProps) {
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [error, setError] = useState("");
 
-    const validateAndStart = (n1: number, n2: number, n3: number, movingLine?: number) => {
+    const validateAndStart = (n1: number, n2: number, n3: number, movingLine?: number, method: DivinationMethod = "manual", generatedAt: Date = new Date()) => {
         if (!question.trim()) {
             setError("请先输入您想问的事情");
             return;
         }
         setError("");
-        startDivination(n1, n2, n3, movingLine);
+        startDivination(n1, n2, n3, movingLine, method, generatedAt);
     };
 
     const handleSubmit = (e: React.FormEvent) => {
@@ -37,10 +38,10 @@ export default function DivinationForm({ onComplete }: DivinationFormProps) {
         validateAndStart(parseInt(num1), parseInt(num2), parseInt(num3));
     };
 
-    const startDivination = (n1: number, n2: number, n3: number, movingLine?: number) => {
+    const startDivination = (n1: number, n2: number, n3: number, movingLine?: number, method: DivinationMethod = "manual", generatedAt: Date = new Date()) => {
         setIsSubmitting(true);
         setTimeout(() => {
-            onComplete(n1, n2, n3, question, movingLine);
+            onComplete(n1, n2, n3, question, movingLine, method, generatedAt);
             setIsSubmitting(false);
         }, 1000);
     };
@@ -50,13 +51,14 @@ export default function DivinationForm({ onComplete }: DivinationFormProps) {
             setError("请先输入您想问的事情");
             return;
         }
+        const generatedAt = new Date();
         const r1 = Math.floor(Math.random() * 100) + 1;
         const r2 = Math.floor(Math.random() * 100) + 1;
         const r3 = Math.floor(Math.random() * 100) + 1;
         setNum1(r1.toString());
         setNum2(r2.toString());
         setNum3(r3.toString());
-        validateAndStart(r1, r2, r3);
+        validateAndStart(r1, r2, r3, undefined, "random", generatedAt);
     };
 
     const handleTime = () => {
@@ -65,11 +67,11 @@ export default function DivinationForm({ onComplete }: DivinationFormProps) {
             return;
         }
         import("@/lib/meihua").then(({ generateTimeBasedNumbers }) => {
-            const { num1: t1, num2: t2, num3: t3, movingLine } = generateTimeBasedNumbers();
+            const { num1: t1, num2: t2, num3: t3, movingLine, generatedAt } = generateTimeBasedNumbers();
             setNum1(t1.toString());
             setNum2(t2.toString());
             setNum3(t3.toString());
-            validateAndStart(t1, t2, t3, movingLine);
+            validateAndStart(t1, t2, t3, movingLine, "time", generatedAt);
         });
     };
 
@@ -205,4 +207,3 @@ export default function DivinationForm({ onComplete }: DivinationFormProps) {
         </motion.div>
     );
 }
-
