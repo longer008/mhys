@@ -76,9 +76,9 @@ export default function HexagramDisplay({ result, question, onReset, onInterpret
 原始数字：上卦数=${rawNumbers?.num1 ?? "旧记录未保存"}，下卦数=${rawNumbers?.num2 ?? "旧记录未保存"}，动爻数=${rawNumbers?.num3 ?? "旧记录未保存"}，最终动爻=${rawNumbers?.movingLine ?? result.movingLine}
 
 【程序计算结果｜卦象数据】
-本卦：${result.main.upper.name}${result.main.lower.name}（上卦${result.main.upper.name}/${result.main.upper.nature}/五行${result.main.upper.wuxing}，下卦${result.main.lower.name}/${result.main.lower.nature}/五行${result.main.lower.wuxing}）
-互卦：${result.mutual.upper.name}${result.mutual.lower.name}（上卦${result.mutual.upper.name}/${result.mutual.upper.nature}/五行${result.mutual.upper.wuxing}，下卦${result.mutual.lower.name}/${result.mutual.lower.nature}/五行${result.mutual.lower.wuxing}）
-变卦：${result.changed.upper.name}${result.changed.lower.name}（上卦${result.changed.upper.name}/${result.changed.upper.nature}/五行${result.changed.upper.wuxing}，下卦${result.changed.lower.name}/${result.changed.lower.nature}/五行${result.changed.lower.wuxing}）
+本卦：${result.main.name}（第${result.main.info.sequence}卦，${result.main.info.judgment}；上卦${result.main.upper.name}/${result.main.upper.nature}/五行${result.main.upper.wuxing}，下卦${result.main.lower.name}/${result.main.lower.nature}/五行${result.main.lower.wuxing}）
+互卦：${result.mutual.name}（第${result.mutual.info.sequence}卦，${result.mutual.info.judgment}；上卦${result.mutual.upper.name}/${result.mutual.upper.nature}/五行${result.mutual.upper.wuxing}，下卦${result.mutual.lower.name}/${result.mutual.lower.nature}/五行${result.mutual.lower.wuxing}）
+变卦：${result.changed.name}（第${result.changed.info.sequence}卦，${result.changed.info.judgment}；上卦${result.changed.upper.name}/${result.changed.upper.nature}/五行${result.changed.upper.wuxing}，下卦${result.changed.lower.name}/${result.changed.lower.nature}/五行${result.changed.lower.wuxing}）
 动爻：第${result.movingLine}爻
 
 【程序计算结果｜体用分析】
@@ -91,7 +91,7 @@ export default function HexagramDisplay({ result, question, onReset, onInterpret
 2. 五行体用关系只代表基础倾向，不是最终结论。最终解读必须结合本卦、互卦、变卦、动爻和所问之事；但结合分析不得推翻程序计算结果。
 3. 解读优先级必须按此顺序展开：体用五行 -> 本卦现状 -> 互卦过程/隐情 -> 变卦趋势 -> 动爻 -> 针对所问事项给建议。
 4. 必须围绕所问之事，少空话，明确说明成败倾向、主要阻力、较合适的时机、可执行的行动建议。
-5. 如果没有提供标准六十四卦名，不要编造卦名；只使用上方已提供的上下卦组合（如“乾坤”“震坎”）来称呼。
+5. 程序已经提供标准六十四卦名与卦序，必须使用这些卦名（如“水天需”“天水讼”），不得自行按上下卦组合另造“坎乾卦”“乾坎卦”等名称。
 6. 若时间、农历、meta 或体用关系为“旧记录未保存”，只能说明信息缺失并基于已给事实谨慎解释，不得改用当前时间重新计算。
 `;
 
@@ -174,7 +174,7 @@ export default function HexagramDisplay({ result, question, onReset, onInterpret
                         <Trigram lines={result.main.lower.lines} name={result.main.lower.name} position="bottom" />
                     </div>
                     <p className="mt-2 text-stone-600 font-serif text-base">
-                        {result.main.upper.name}{result.main.lower.name}
+                        {result.main.name}
                         <span className="text-[10px] text-stone-400 ml-1 block text-center">
                             (上{result.main.upper.wuxing}/下{result.main.lower.wuxing})
                         </span>
@@ -188,7 +188,7 @@ export default function HexagramDisplay({ result, question, onReset, onInterpret
                         <Trigram lines={result.mutual.lower.lines} name={result.mutual.lower.name} position="bottom" />
                     </div>
                     <p className="mt-2 text-stone-600 font-serif text-base">
-                        {result.mutual.upper.name}{result.mutual.lower.name}
+                        {result.mutual.name}
                         <span className="text-[10px] text-stone-400 ml-1 block text-center">
                             (上{result.mutual.upper.wuxing}/下{result.mutual.lower.wuxing})
                         </span>
@@ -202,7 +202,7 @@ export default function HexagramDisplay({ result, question, onReset, onInterpret
                         <Trigram lines={result.changed.lower.lines} name={result.changed.lower.name} position="bottom" />
                     </div>
                     <p className="mt-2 text-stone-600 font-serif text-base">
-                        {result.changed.upper.name}{result.changed.lower.name}
+                        {result.changed.name}
                         <span className="text-[10px] text-stone-400 ml-1 block text-center">
                             (上{result.changed.upper.wuxing}/下{result.changed.lower.wuxing})
                         </span>

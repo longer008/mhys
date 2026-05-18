@@ -91,11 +91,11 @@ export function HistoryDialog({ open, onOpenChange }: HistoryDialogProps) {
                                         <h3 className="font-medium text-stone-800">{record.question || '无问题'}</h3>
                                         <div className="text-sm text-stone-600">
                                             <span className="font-serif text-stone-800">
-                                                {record.result.main.upper.name}{record.result.main.lower.name}卦
+                                                {record.result.main.name || `${record.result.main.upper.name}${record.result.main.lower.name}卦`}
                                             </span>
                                             {' -> '}
                                             <span className="font-serif text-stone-800">
-                                                {record.result.changed.upper.name}{record.result.changed.lower.name}卦
+                                                {record.result.changed.name || `${record.result.changed.upper.name}${record.result.changed.lower.name}卦`}
                                             </span>
                                         </div>
                                     </div>
