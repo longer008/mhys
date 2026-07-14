@@ -1,132 +1,191 @@
-import React, { useEffect, useState } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
-import { getHistory, clearHistory, deleteRecord, DivinationRecord } from '@/lib/history';
-import { Trash2, History, ChevronDown, ChevronUp } from 'lucide-react';
-import { Card } from '@/components/ui/card';
-
-import ReactMarkdown from 'react-markdown';
+import React, { useEffect, useState } from "react";
+import ReactMarkdown from "react-markdown";
+import { ChevronDown, ChevronUp, History, Trash2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogHeader,
+    DialogTitle,
+} from "@/components/ui/dialog";
+import {
+    clearHistory,
+    deleteRecord,
+    getHistory,
+    type DivinationRecord,
+} from "@/lib/history";
+import { getStandardHexagramName } from "@/lib/meihua";
 
 interface HistoryDialogProps {
     open: boolean;
     onOpenChange: (open: boolean) => void;
+    triggerRef?: React.RefObject<HTMLButtonElement | null>;
 }
 
-export function HistoryDialog({ open, onOpenChange }: HistoryDialogProps) {
+export function HistoryDialog({ open, onOpenChange, triggerRef }: HistoryDialogProps) {
     const [history, setHistory] = useState<DivinationRecord[]>([]);
     const [expandedId, setExpandedId] = useState<string | null>(null);
 
     useEffect(() => {
-        if (open) {
+        if (!open) return;
+
+        const frameId = window.requestAnimationFrame(() => {
             setHistory(getHistory());
-        }
+        });
+
+        return () => {
+            window.cancelAnimationFrame(frameId);
+        };
     }, [open]);
 
     const handleClear = () => {
-        if (confirm('确定要清空所有占卜记录吗？')) {
+        if (confirm("确定要清空所有占卜记录吗？")) {
             clearHistory();
             setHistory([]);
+            setExpandedId(null);
         }
     };
 
-    const handleDelete = (e: React.MouseEvent, id: string) => {
-        e.stopPropagation();
-        if (confirm('确定要删除这条记录吗？')) {
-            deleteRecord(id);
-            setHistory(prev => prev.filter(record => record.id !== id));
+    const handleDelete = (event: React.MouseEvent, id: string) => {
+        event.stopPropagation();
+        if (confirm("确定要删除这条记录吗？")) {
+            const deleted = deleteRecord(id);
+            if (deleted) {
+                setHistory((previous) => previous.filter((record) => record.id !== id));
+                setExpandedId((previous) => previous === id ? null : previous);
+            }
         }
     };
 
     const toggleExpand = (id: string) => {
-        setExpandedId(expandedId === id ? null : id);
+        setExpandedId((previous) => previous === id ? null : id);
     };
 
-    const formatDate = (timestamp: number) => {
-        return new Date(timestamp).toLocaleString('zh-CN', {
-            year: 'numeric',
-            month: '2-digit',
-            day: '2-digit',
-            hour: '2-digit',
-            minute: '2-digit',
+    const formatDate = (createdAt: string) => {
+        return new Date(createdAt).toLocaleString("zh-CN", {
+            year: "numeric",
+            month: "2-digit",
+            day: "2-digit",
+            hour: "2-digit",
+            minute: "2-digit",
         });
     };
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="max-w-2xl max-h-[80vh] flex flex-col bg-stone-50/95 backdrop-blur-sm border-stone-200">
-                <DialogHeader className="flex flex-row items-center justify-between space-y-0 pb-4 border-b border-stone-200">
-                    <DialogTitle className="text-2xl font-serif text-stone-800 flex items-center gap-2">
-                        <History className="w-6 h-6" />
-                        占卜历史
-                    </DialogTitle>
-                    {history.length > 0 && (
-                        <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={handleClear}
-                            className="text-stone-500 hover:text-red-600 hover:bg-red-50 mr-6"
-                        >
-                            <Trash2 className="w-4 h-4 mr-1" />
-                            清空
-                        </Button>
-                    )}
+            <DialogContent
+                className="frontend-theme flex max-h-[82dvh] max-w-2xl flex-col p-0"
+                onCloseAutoFocus={(event) => {
+                    if (!triggerRef?.current) return;
+                    event.preventDefault();
+                    triggerRef.current.focus();
+                }}
+            >
+                <DialogHeader className="border-b border-border px-6 py-5 pr-16">
+                    <div className="flex items-start justify-between gap-4">
+                        <div>
+                            <div className="mb-2 flex items-center gap-2 text-xs font-medium tracking-[0.18em] text-[var(--cinnabar)]">
+                                <History className="h-4 w-4" aria-hidden="true" />
+                                往期占验
+                            </div>
+                            <DialogTitle className="text-2xl">占卜历史</DialogTitle>
+                            <DialogDescription className="mt-2">
+                                展开记录可查看完整解读。
+                            </DialogDescription>
+                        </div>
+                        {history.length > 0 && (
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={handleClear}
+                                className="shrink-0 text-destructive hover:text-destructive"
+                            >
+                                <Trash2 aria-hidden="true" />
+                                清空
+                            </Button>
+                        )}
+                    </div>
                 </DialogHeader>
 
-                <div className="flex-1 overflow-y-auto py-4 space-y-4 pr-2">
+                <div className="flex-1 overflow-y-auto px-4 py-4 sm:px-6">
                     {history.length === 0 ? (
-                        <div className="text-center text-stone-400 py-12">
-                            暂无占卜记录
+                        <div className="grid min-h-64 place-items-center border border-dashed border-border bg-muted/30 px-6 text-center">
+                            <div>
+                                <History className="mx-auto mb-4 h-8 w-8 text-[var(--cinnabar)]/60" aria-hidden="true" />
+                                <p className="font-medium text-foreground">暂无占卜记录</p>
+                                <p className="mt-2 text-sm text-muted-foreground">完成一次解卦后，记录会显示在这里。</p>
+                            </div>
                         </div>
                     ) : (
-                        history.map((record) => (
-                            <Card key={record.id} className="bg-white/50 border-stone-200 hover:bg-white/80 transition-colors">
-                                <div
-                                    className="p-4 cursor-pointer flex items-start justify-between"
-                                    onClick={() => toggleExpand(record.id)}
-                                >
-                                    <div className="space-y-1 flex-1">
-                                        <div className="flex items-center gap-2 text-sm text-stone-500">
-                                            <span>{formatDate(record.timestamp)}</span>
-                                        </div>
-                                        <h3 className="font-medium text-stone-800">{record.question || '无问题'}</h3>
-                                        <div className="text-sm text-stone-600">
-                                            <span className="font-serif text-stone-800">
-                                                {record.result.main.name || `${record.result.main.upper.name}${record.result.main.lower.name}卦`}
-                                            </span>
-                                            {' -> '}
-                                            <span className="font-serif text-stone-800">
-                                                {record.result.changed.name || `${record.result.changed.upper.name}${record.result.changed.lower.name}卦`}
-                                            </span>
-                                        </div>
-                                    </div>
-                                    <div className="flex flex-col gap-2">
-                                        <Button
-                                            variant="ghost"
-                                            size="sm"
-                                            onClick={(e) => handleDelete(e, record.id)}
-                                            className="text-stone-400 hover:text-red-600 hover:bg-red-50 h-8 w-8 p-0"
-                                            title="删除"
-                                        >
-                                            <Trash2 className="w-4 h-4" />
-                                        </Button>
-                                        <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                                            {expandedId === record.id ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-                                        </Button>
-                                    </div>
-                                </div>
-
-                                {expandedId === record.id && (
-                                    <div className="px-4 pb-4 border-t border-stone-100 pt-4">
-                                        <div className="prose prose-stone max-w-none text-sm">
-                                            <h4 className="text-stone-700 font-medium mb-2">解卦结果</h4>
-                                            <div className="text-stone-600 leading-relaxed">
-                                                <ReactMarkdown>{record.interpretation}</ReactMarkdown>
+                        <div className="divide-y divide-border border-y border-border">
+                            {history.map((record) => {
+                                const isExpanded = expandedId === record.id;
+                                return (
+                                    <article key={record.id}>
+                                        <div className="flex items-start gap-3 py-4">
+                                            <button
+                                                type="button"
+                                                className="min-w-0 flex-1 rounded-sm text-left"
+                                                onClick={() => toggleExpand(record.id)}
+                                                aria-expanded={isExpanded}
+                                                aria-controls={`history-detail-${record.id}`}
+                                            >
+                                                <div className="space-y-1.5">
+                                                    <time className="tabular-nums text-xs tracking-[0.08em] text-muted-foreground">
+                                                        {formatDate(record.createdAt)}
+                                                    </time>
+                                                    <h3 className="font-medium leading-6 text-foreground">{record.question || "无问题"}</h3>
+                                                    <div className="text-sm text-muted-foreground">
+                                                        <span className="text-foreground">
+                                                            {getStandardHexagramName(record.result.main.upper, record.result.main.lower)}
+                                                        </span>
+                                                        <span className="mx-2 text-[var(--cinnabar)]">→</span>
+                                                        <span className="text-foreground">
+                                                            {getStandardHexagramName(record.result.changed.upper, record.result.changed.lower)}
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                            </button>
+                                            <div className="flex shrink-0 items-center gap-1">
+                                                <Button
+                                                    type="button"
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    onClick={(event) => handleDelete(event, record.id)}
+                                                    className="text-muted-foreground hover:text-destructive"
+                                                    aria-label={`删除记录：${record.question || "无问题"}`}
+                                                >
+                                                    <Trash2 aria-hidden="true" />
+                                                </Button>
+                                                <Button
+                                                    type="button"
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    onClick={() => toggleExpand(record.id)}
+                                                    aria-label={isExpanded ? "收起解读" : "展开解读"}
+                                                    aria-expanded={isExpanded}
+                                                    aria-controls={`history-detail-${record.id}`}
+                                                >
+                                                    {isExpanded ? <ChevronUp aria-hidden="true" /> : <ChevronDown aria-hidden="true" />}
+                                                </Button>
                                             </div>
                                         </div>
-                                    </div>
-                                )}
-                            </Card>
-                        ))
+
+                                        {isExpanded && (
+                                            <div id={`history-detail-${record.id}`} className="mb-5 border-l-2 border-[var(--cinnabar)]/45 bg-muted/35 px-4 py-4">
+                                                <div className="prose prose-stone max-w-none text-sm">
+                                                    <h4 className="mb-2 font-medium text-foreground">解卦结果</h4>
+                                                    <div className="leading-7 text-muted-foreground">
+                                                        <ReactMarkdown>{record.interpretation}</ReactMarkdown>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </article>
+                                );
+                            })}
+                        </div>
                     )}
                 </div>
             </DialogContent>

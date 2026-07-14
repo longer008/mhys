@@ -1,132 +1,68 @@
-import { NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
-import { isDbEnabled, getAllRecords, deleteRecord, initDatabase } from '@/lib/db';
+import { z } from "zod";
+import { requireAdminSession } from "@/server/auth/admin-request";
+import { isDatabaseConfigured } from "@/server/db/client";
+import { deleteAdminRecord, listAdminRecords } from "@/server/db/admin-repository";
+import { ApiError } from "@/server/http/api-error";
+import { assertSameOrigin } from "@/server/http/origin";
+import { parseJsonBody } from "@/server/http/request";
+import { apiFailure, apiSuccess, getRequestId } from "@/server/http/response";
 
-const ADMIN_SESSION_COOKIE = 'meihua_admin_session';
+export const runtime = "nodejs";
 
-// 验证管理员身份
-async function verifyAdmin(): Promise<boolean> {
-    const cookieStore = await cookies();
-    const sessionCookie = cookieStore.get(ADMIN_SESSION_COOKIE)?.value;
-    const sessionSecret = process.env.ADMIN_SESSION_SECRET;
+const querySchema = z.strictObject({
+    page: z.coerce.number().int().min(1).max(100_000).default(1),
+    pageSize: z.coerce.number().int().min(1).max(100).default(20),
+    search: z.string().trim().max(100).optional(),
+});
 
-    if (!sessionCookie || !sessionSecret) {
-        return false;
-    }
+const deleteSchema = z.strictObject({ id: z.uuid() });
 
-    const [token, hash] = sessionCookie.split(':');
+export async function GET(request: Request) {
+    const requestId = getRequestId(request);
 
-    // 简单哈希验证
-    let hashValue = 0;
-    const str = token + sessionSecret;
-    for (let i = 0; i < str.length; i++) {
-        const char = str.charCodeAt(i);
-        hashValue = ((hashValue << 5) - hashValue) + char;
-        hashValue = hashValue & hashValue;
-    }
-
-    return hash === hashValue.toString(36);
-}
-
-// 获取所有记录（分页）
-export async function GET(req: Request) {
     try {
-        if (!isDbEnabled()) {
-            return NextResponse.json(
-                { error: 'Database not configured' },
-                { status: 503 }
-            );
+        await requireAdminSession();
+        if (!isDatabaseConfigured()) {
+            throw new ApiError(503, "DATABASE_UNAVAILABLE", "数据库尚未配置");
         }
 
-        if (!await verifyAdmin()) {
-            return NextResponse.json(
-                { error: 'Unauthorized' },
-                { status: 401 }
-            );
+        const url = new URL(request.url);
+        const parsed = querySchema.safeParse({
+            page: url.searchParams.get("page") || undefined,
+            pageSize: url.searchParams.get("pageSize") || undefined,
+            search: url.searchParams.get("search") || undefined,
+        });
+        if (!parsed.success) {
+            throw new ApiError(400, "INVALID_QUERY", "分页或搜索参数无效");
         }
 
-        const { searchParams } = new URL(req.url);
-        const page = parseInt(searchParams.get('page') || '1', 10);
-        const pageSize = parseInt(searchParams.get('pageSize') || '20', 10);
-        const search = searchParams.get('search') || undefined;
-
-        await initDatabase();
-        const { records, total } = await getAllRecords(page, pageSize, search);
-
-        // 辅助函数：解析可能双重编码的 result（兼容旧数据）
-        const parseResult = (result: unknown) => {
-            // 如果已经是对象，直接返回
-            if (typeof result === 'object' && result !== null) {
-                return result;
-            }
-            // 如果是字符串（双重编码的旧数据），尝试解析
-            if (typeof result === 'string') {
-                try {
-                    return JSON.parse(result);
-                } catch {
-                    return result;
-                }
-            }
-            return result;
-        };
-
-        return NextResponse.json({
-            records: records.map(r => ({
-                id: r.id,
-                user_id: r.user_id,
-                question: r.question,
-                result: parseResult(r.result),
-                interpretation: r.interpretation,
-                created_at: r.created_at,
-            })),
+        const { page, pageSize, search } = parsed.data;
+        const { records, total } = await listAdminRecords({ page, pageSize, search });
+        return apiSuccess({
+            records,
             total,
             page,
             pageSize,
             totalPages: Math.ceil(total / pageSize),
-        });
+        }, requestId);
     } catch (error) {
-        console.error('Get records error:', error);
-        return NextResponse.json(
-            { error: 'Internal server error' },
-            { status: 500 }
-        );
+        return apiFailure(error, requestId, { route: "/api/admin/records" });
     }
 }
 
-// 删除记录
-export async function DELETE(req: Request) {
+export async function DELETE(request: Request) {
+    const requestId = getRequestId(request);
+
     try {
-        if (!isDbEnabled()) {
-            return NextResponse.json(
-                { error: 'Database not configured' },
-                { status: 503 }
-            );
+        assertSameOrigin(request);
+        await requireAdminSession();
+        const { id } = await parseJsonBody(request, deleteSchema, 4 * 1024);
+        const deleted = await deleteAdminRecord(id);
+        if (!deleted) {
+            throw new ApiError(404, "RECORD_NOT_FOUND", "记录不存在");
         }
-
-        if (!await verifyAdmin()) {
-            return NextResponse.json(
-                { error: 'Unauthorized' },
-                { status: 401 }
-            );
-        }
-
-        const { id } = await req.json();
-
-        if (!id) {
-            return NextResponse.json(
-                { error: 'Missing record id' },
-                { status: 400 }
-            );
-        }
-
-        await deleteRecord(id);
-
-        return NextResponse.json({ success: true });
+        return apiSuccess({ deleted: true }, requestId);
     } catch (error) {
-        console.error('Delete record error:', error);
-        return NextResponse.json(
-            { error: 'Internal server error' },
-            { status: 500 }
-        );
+        return apiFailure(error, requestId, { route: "/api/admin/records" });
     }
 }

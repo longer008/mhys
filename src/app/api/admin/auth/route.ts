@@ -1,118 +1,93 @@
-import { NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
-import { isDbEnabled } from '@/lib/db';
+import { cookies } from "next/headers";
+import { z } from "zod";
+import {
+    ADMIN_SESSION_COOKIE,
+    ADMIN_SESSION_MAX_AGE,
+    createAdminSessionToken,
+    verifyAdminPassword,
+} from "@/server/auth/admin-session";
+import { hasValidAdminSession } from "@/server/auth/admin-request";
+import { getAdminConfig, isAdminConfigured } from "@/server/config/env";
+import { isDatabaseConfigured } from "@/server/db/client";
+import { ApiError } from "@/server/http/api-error";
+import { assertSameOrigin } from "@/server/http/origin";
+import { parseJsonBody } from "@/server/http/request";
+import { apiFailure, apiSuccess, getRequestId } from "@/server/http/response";
+import {
+    enforceRateLimit,
+    getRequestIp,
+    hashRateLimitKey,
+} from "@/server/security/rate-limit";
 
-const ADMIN_SESSION_COOKIE = 'meihua_admin_session';
-const SESSION_MAX_AGE = 24 * 60 * 60; // 24 hours
+export const runtime = "nodejs";
 
-// 简单的 session token 生成
-function generateSessionToken(): string {
-    const timestamp = Date.now().toString(36);
-    const random = Math.random().toString(36).substring(2);
-    return `${timestamp}-${random}`;
-}
+const loginSchema = z.strictObject({
+    password: z.string().min(1).max(256),
+});
 
-// 验证 session token（简单实现，生产环境建议使用 JWT）
-function hashPassword(password: string, secret: string): string {
-    // 简单哈希，生产环境建议使用更安全的方法
-    let hash = 0;
-    const str = password + secret;
-    for (let i = 0; i < str.length; i++) {
-        const char = str.charCodeAt(i);
-        hash = ((hash << 5) - hash) + char;
-        hash = hash & hash;
-    }
-    return hash.toString(36);
-}
+export async function POST(request: Request) {
+    const requestId = getRequestId(request);
 
-// 登录
-export async function POST(req: Request) {
     try {
-        if (!isDbEnabled()) {
-            return NextResponse.json(
-                { error: 'Admin panel not available' },
-                { status: 503 }
-            );
+        assertSameOrigin(request);
+
+        if (!isDatabaseConfigured() || !isAdminConfigured()) {
+            throw new ApiError(503, "ADMIN_UNAVAILABLE", "管理后台尚未配置");
         }
 
-        const { password } = await req.json();
-        const adminPassword = process.env.ADMIN_PASSWORD;
-        const sessionSecret = process.env.ADMIN_SESSION_SECRET;
-
-        if (!adminPassword || !sessionSecret) {
-            return NextResponse.json(
-                { error: 'Admin not configured' },
-                { status: 500 }
-            );
-        }
-
-        if (password !== adminPassword) {
-            return NextResponse.json(
-                { error: 'Invalid password' },
-                { status: 401 }
-            );
-        }
-
-        // 生成 session token
-        const sessionToken = generateSessionToken();
-        const tokenHash = hashPassword(sessionToken, sessionSecret);
-
-        const response = NextResponse.json({
-            success: true,
-            message: 'Logged in successfully',
+        const { password } = await parseJsonBody(request, loginSchema, 4 * 1024);
+        const config = getAdminConfig();
+        const keyHash = hashRateLimitKey(
+            "admin-login",
+            getRequestIp(request),
+            config.sessionSecret
+        );
+        await enforceRateLimit({
+            scope: "admin_login_15m",
+            keyHash,
+            limit: 5,
+            windowSeconds: 15 * 60,
         });
 
-        // 设置 session cookie
-        response.cookies.set(ADMIN_SESSION_COOKIE, `${sessionToken}:${tokenHash}`, {
-            maxAge: SESSION_MAX_AGE,
+        if (!verifyAdminPassword(password)) {
+            throw new ApiError(401, "INVALID_CREDENTIALS", "密码错误");
+        }
+
+        const response = apiSuccess({ message: "登录成功" }, requestId);
+        response.cookies.set(ADMIN_SESSION_COOKIE, createAdminSessionToken(), {
+            maxAge: ADMIN_SESSION_MAX_AGE,
             httpOnly: true,
-            secure: process.env.NODE_ENV === 'production',
-            sameSite: 'lax',
-            path: '/',
+            secure: process.env.NODE_ENV === "production",
+            sameSite: "strict",
+            path: "/",
         });
-
         return response;
     } catch (error) {
-        console.error('Admin login error:', error);
-        return NextResponse.json(
-            { error: 'Internal server error' },
-            { status: 500 }
-        );
+        return apiFailure(error, requestId, { route: "/api/admin/auth" });
     }
 }
 
-// 检查登录状态
-export async function GET() {
+export async function GET(request: Request) {
+    const requestId = getRequestId(request);
+
     try {
-        if (!isDbEnabled()) {
-            return NextResponse.json({ authenticated: false, dbEnabled: false });
-        }
-
-        const cookieStore = await cookies();
-        const sessionCookie = cookieStore.get(ADMIN_SESSION_COOKIE)?.value;
-        const sessionSecret = process.env.ADMIN_SESSION_SECRET;
-
-        if (!sessionCookie || !sessionSecret) {
-            return NextResponse.json({ authenticated: false, dbEnabled: true });
-        }
-
-        const [token, hash] = sessionCookie.split(':');
-        const expectedHash = hashPassword(token, sessionSecret);
-
-        if (hash !== expectedHash) {
-            return NextResponse.json({ authenticated: false, dbEnabled: true });
-        }
-
-        return NextResponse.json({ authenticated: true, dbEnabled: true });
+        const dbEnabled = isDatabaseConfigured();
+        const authenticated = dbEnabled && await hasValidAdminSession();
+        return apiSuccess({ authenticated, dbEnabled }, requestId);
     } catch (error) {
-        console.error('Auth check error:', error);
-        return NextResponse.json({ authenticated: false, dbEnabled: true });
+        return apiFailure(error, requestId, { route: "/api/admin/auth" });
     }
 }
 
-// 登出
-export async function DELETE() {
-    const response = NextResponse.json({ success: true });
-    response.cookies.delete(ADMIN_SESSION_COOKIE);
-    return response;
+export async function DELETE(request: Request) {
+    const requestId = getRequestId(request);
+
+    try {
+        assertSameOrigin(request);
+        const cookieStore = await cookies();
+        cookieStore.delete(ADMIN_SESSION_COOKIE);
+        return apiSuccess({ success: true }, requestId);
+    } catch (error) {
+        return apiFailure(error, requestId, { route: "/api/admin/auth" });
+    }
 }

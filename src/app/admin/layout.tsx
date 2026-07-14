@@ -4,6 +4,12 @@ import { useEffect, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { LayoutDashboard, FileText, Settings, LogOut, Menu, X } from 'lucide-react';
+import { fetchApi } from '@/lib/api-client';
+
+interface AdminAuthState {
+    authenticated: boolean;
+    dbEnabled: boolean;
+}
 
 export default function AdminLayout({
     children,
@@ -24,10 +30,9 @@ export default function AdminLayout({
     const checkAuth = async () => {
 
         try {
-            const res = await fetch('/api/admin/auth', {
+            const data = await fetchApi<AdminAuthState>('/api/admin/auth', {
                 cache: 'no-store',
             });
-            const data = await res.json();
             setDbEnabled(data.dbEnabled);
             setIsAuthenticated(data.authenticated);
 
@@ -46,8 +51,11 @@ export default function AdminLayout({
     };
 
     const handleLogout = async () => {
-        await fetch('/api/admin/auth', { method: 'DELETE' });
-        router.replace('/admin/login');
+        try {
+            await fetchApi<{ success: boolean }>('/api/admin/auth', { method: 'DELETE' });
+        } finally {
+            router.replace('/admin/login');
+        }
     };
 
     // 加载中

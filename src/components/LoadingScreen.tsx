@@ -1,17 +1,15 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 
 interface LoadingScreenProps {
   onComplete: () => void;
 }
 
 export default function LoadingScreen({ onComplete }: LoadingScreenProps) {
-  const [isExiting, setIsExiting] = useState(false);
-
   useEffect(() => {
-    const minDuration = 1000; // Minimum 1 second
+    const minDuration = 520;
     const startTime = Date.now();
     let isMounted = true;
 
@@ -26,7 +24,7 @@ export default function LoadingScreen({ onComplete }: LoadingScreenProps) {
       }, remainingTime);
     };
 
-    // Check if page is already loaded
+    // 页面已完成加载时直接进入最短展示计时。
     if (document.readyState === "complete") {
       handleLoad();
     } else {
@@ -39,38 +37,36 @@ export default function LoadingScreen({ onComplete }: LoadingScreenProps) {
     };
   }, [onComplete]);
 
-  // Bagua Trigrams (Pre-heaven / Xian Tian sequence)
-  // Top: Qian (Heaven), Bottom: Kun (Earth), etc.
-  // Represented as 3 lines (1 = Yang/Solid, 0 = Yin/Broken)
+  // 先天八卦序列，1 表示阳爻，0 表示阴爻。
   const trigrams = [
-    { name: "Qian", lines: [1, 1, 1], angle: 0 },    // Heaven (South)
-    { name: "Xun", lines: [1, 1, 0], angle: 45 },    // Wind (Southwest)
-    { name: "Kan", lines: [0, 1, 0], angle: 90 },    // Water (West)
-    { name: "Gen", lines: [0, 0, 1], angle: 135 },   // Mountain (Northwest)
-    { name: "Kun", lines: [0, 0, 0], angle: 180 },   // Earth (North)
-    { name: "Zhen", lines: [0, 0, 1], angle: 225 },  // Thunder (Northeast)
-    { name: "Li", lines: [1, 0, 1], angle: 270 },    // Fire (East)
-    { name: "Dui", lines: [0, 1, 1], angle: 315 },   // Lake (Southeast)
+    { name: "Qian", lines: [1, 1, 1], angle: 0 },
+    { name: "Xun", lines: [1, 1, 0], angle: 45 },
+    { name: "Kan", lines: [0, 1, 0], angle: 90 },
+    { name: "Gen", lines: [0, 0, 1], angle: 135 },
+    { name: "Kun", lines: [0, 0, 0], angle: 180 },
+    { name: "Zhen", lines: [0, 0, 1], angle: 225 },
+    { name: "Li", lines: [1, 0, 1], angle: 270 },
+    { name: "Dui", lines: [0, 1, 1], angle: 315 },
   ];
 
   return (
     <motion.div
-      className="fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-[#fafaf9] overflow-hidden"
+      className="fixed inset-0 z-[60] flex flex-col items-center justify-center overflow-hidden bg-background"
       initial={{ opacity: 1 }}
-      exit={{ opacity: 0, transition: { duration: 0.8, ease: "easeInOut" } }}
+      exit={{ opacity: 0, transition: { duration: 0.18, ease: "easeOut" } }}
     >
       {/* Background Texture */}
-      <div className="absolute inset-0 opacity-40 pointer-events-none"
+      <div className="pointer-events-none absolute inset-0 opacity-40"
         style={{
           backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.04'/%3E%3C/svg%3E")`
         }}
       />
 
       {/* Main Container - Flex Column for Layout */}
-      <div className="relative flex flex-col items-center gap-12">
+      <div className="relative flex flex-col items-center gap-6">
 
         {/* Animation Container */}
-        <div className="relative w-64 h-64 md:w-80 md:h-80 flex items-center justify-center">
+        <div className="relative flex h-44 w-44 items-center justify-center sm:h-52 sm:w-52">
           <svg className="absolute w-full h-full pointer-events-none" viewBox="0 0 400 400">
             <defs>
               <filter id="ink-wash-taiji">
@@ -87,7 +83,7 @@ export default function LoadingScreen({ onComplete }: LoadingScreenProps) {
             <motion.g
               initial={{ opacity: 0, scale: 0.8, rotate: -90 }}
               animate={{ opacity: 1, scale: 1, rotate: 360 }}
-              transition={{ duration: 8, ease: "linear", repeat: Infinity }}
+              transition={{ duration: 5, ease: "linear", repeat: Infinity }}
               style={{ originX: 0.5, originY: 0.5 }}
             >
               {/* Yang (White/Light) Fish */}
@@ -99,7 +95,7 @@ export default function LoadingScreen({ onComplete }: LoadingScreenProps) {
                 fill="#1a1a1a"
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
-                transition={{ duration: 1.5, delay: 0.2 }}
+                transition={{ duration: 0.36, delay: 0.06 }}
               />
 
               {/* Eyes */}
@@ -111,10 +107,10 @@ export default function LoadingScreen({ onComplete }: LoadingScreenProps) {
             <motion.g
               initial={{ opacity: 0, rotate: 45 }}
               animate={{ opacity: 1, rotate: -360 }}
-              transition={{ duration: 12, ease: "linear", repeat: Infinity }}
+              transition={{ duration: 8, ease: "linear", repeat: Infinity }}
               style={{ originX: 0.5, originY: 0.5 }}
             >
-              {trigrams.map((trigram, i) => {
+              {trigrams.map((trigram) => {
                 const radius = 160;
                 const rad = (trigram.angle - 90) * (Math.PI / 180);
                 // Fix hydration mismatch by rounding coordinates
@@ -146,16 +142,16 @@ export default function LoadingScreen({ onComplete }: LoadingScreenProps) {
 
         {/* Text Overlay - Positioned Below */}
         <motion.div
-          className="flex flex-col items-center gap-4 z-10"
-          initial={{ opacity: 0, y: 20 }}
+          className="z-10 flex flex-col items-center gap-3"
+          initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 1.2, duration: 1 }}
+          transition={{ delay: 0.12, duration: 0.3 }}
         >
-          <h1 className="text-3xl md:text-4xl font-song font-bold text-[#1a1a1a] tracking-[0.8em] ml-4">梅花易数</h1>
-          <div className="flex items-center gap-4 opacity-60">
-            <div className="h-[1px] w-8 bg-[#8c3f3f]" />
-            <p className="text-xs md:text-sm text-stone-600 font-kai tracking-[0.4em]">观象授时 · 万物皆数</p>
-            <div className="h-[1px] w-8 bg-[#8c3f3f]" />
+          <h1 className="ml-2 font-song text-2xl font-semibold tracking-[0.5em] text-foreground sm:text-3xl">梅花易数</h1>
+          <div className="flex items-center gap-3 text-[var(--cinnabar)] opacity-75">
+            <div className="h-px w-7 bg-current" />
+            <p className="text-[10px] tracking-[0.28em] text-muted-foreground sm:text-xs">观象授时 · 万物皆数</p>
+            <div className="h-px w-7 bg-current" />
           </div>
         </motion.div>
 

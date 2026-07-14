@@ -1,38 +1,154 @@
 "use client";
 
 import { useState } from "react";
-import { cn } from "@/lib/utils";
-import { Sparkles } from "lucide-react";
+import { CircleDot, RotateCcw } from "lucide-react";
+import { Lunar } from "lunar-javascript";
 import type { DivinationResult } from "@/lib/meihua";
+import type { DivinationRequestContext } from "@/features/divination/types";
+import { cn } from "@/lib/utils";
+import { fetchApi } from "@/lib/api-client";
+import { saveHistoryRecord } from "@/lib/history";
+import { getCustomAiConfig } from "@/lib/ai-settings";
 import InterpretationModal from "./InterpretationModal";
 
 interface HexagramProps {
-    lines: boolean[]; // true for Yang (—), false for Yin (-- --)
+    lines: boolean[]; // true 为阳爻，false 为阴爻
     name: string;
     position: "top" | "bottom";
+    role?: "体" | "用";
 }
 
-function Trigram({ lines, name, position }: HexagramProps) {
+function Trigram({ lines, name, position, role }: HexagramProps) {
+    const positionName = position === "top" ? "上卦" : "下卦";
+
     return (
-        <div className={cn("flex flex-col gap-1.5 md:gap-2 items-center", position === "top" ? "mb-0.5 md:mb-1" : "mt-0.5 md:mt-1")}>
-            {lines.slice().reverse().map((isYang, idx) => (
-                <div key={idx} className="w-16 md:w-24 h-3 md:h-4 flex justify-between">
-                    {isYang ? (
-                        <div className="w-full h-full bg-stone-800 rounded-sm" />
-                    ) : (
-                        <>
-                            <div className="w-[45%] h-full bg-stone-800 rounded-sm" />
-                            <div className="w-[45%] h-full bg-stone-800 rounded-sm" />
-                        </>
-                    )}
-                </div>
-            ))}
-            <span className="text-stone-500 text-[10px] md:text-xs font-serif mt-1">{name}</span>
+        <div className="grid grid-cols-[2rem_auto_3rem] items-center justify-center gap-2 sm:gap-3">
+            <div className="flex justify-end">
+                {role && (
+                    <span
+                        className={cn(
+                            "grid size-7 place-items-center border font-song text-xs",
+                            role === "体"
+                                ? "border-stone-500/55 bg-stone-800 text-stone-50"
+                                : "border-[var(--cinnabar)]/55 text-[var(--cinnabar)]"
+                        )}
+                        title={role === "体" ? "体卦：代表自身" : "用卦：代表所问之事"}
+                    >
+                        {role}
+                    </span>
+                )}
+            </div>
+            <div role="img" aria-label={`${positionName}${name}`} className="flex flex-col items-center gap-1.5">
+                {lines.slice().reverse().map((isYang, index) => (
+                    <div key={index} className="flex h-2.5 w-20 justify-between sm:h-3 sm:w-24" aria-hidden="true">
+                        {isYang ? (
+                            <span className="h-full w-full rounded-[1px] bg-stone-800" />
+                        ) : (
+                            <>
+                                <span className="h-full w-[44%] rounded-[1px] bg-stone-800" />
+                                <span className="h-full w-[44%] rounded-[1px] bg-stone-800" />
+                            </>
+                        )}
+                    </div>
+                ))}
+            </div>
+            <div className="font-ui-cn text-xs leading-5 text-stone-500">
+                <span className="block text-[10px] tracking-[0.12em] text-stone-400">{positionName}</span>
+                <span className="block font-medium text-stone-700">{name}</span>
+            </div>
         </div>
     );
 }
 
-export default function HexagramDisplay({ result, question, onReset, onInterpretationComplete }: { result: DivinationResult; question: string; onReset: () => void; onInterpretationComplete?: (interpretation: string) => void }) {
+interface HexagramStageProps {
+    sequence: string;
+    title: string;
+    phase: string;
+    hexagram: DivinationResult["main"];
+    upperRole?: "体" | "用";
+    lowerRole?: "体" | "用";
+    movingLine?: number;
+    isLast?: boolean;
+}
+
+function HexagramStage({
+    sequence,
+    title,
+    phase,
+    hexagram,
+    upperRole,
+    lowerRole,
+    movingLine,
+    isLast = false,
+}: HexagramStageProps) {
+    return (
+        <article
+            className={cn(
+                "relative flex min-w-0 flex-col px-4 py-7 sm:px-7 md:px-5 md:py-8",
+                !isLast && "border-b border-stone-300/80 md:border-r md:border-b-0"
+            )}
+        >
+            <header className="mb-7 flex items-start justify-between gap-4">
+                <div>
+                    <p className="font-ui-cn text-[10px] font-medium tracking-[0.24em] text-stone-400">
+                        {sequence} · {phase}
+                    </p>
+                    <h3 className="mt-2 font-song text-xl font-semibold tracking-[0.12em] text-stone-900">
+                        {title}
+                    </h3>
+                </div>
+                {movingLine && (
+                    <span className="border-l border-[var(--cinnabar)]/60 pl-3 font-ui-cn text-xs leading-5 text-[var(--cinnabar)]">
+                        第{movingLine}爻<br />发动
+                    </span>
+                )}
+            </header>
+
+            <div className="flex flex-1 flex-col justify-center gap-4">
+                <Trigram lines={hexagram.upper.lines} name={hexagram.upper.name} position="top" role={upperRole} />
+                <div className="mx-auto h-px w-28 bg-stone-200 sm:w-32" aria-hidden="true" />
+                <Trigram lines={hexagram.lower.lines} name={hexagram.lower.name} position="bottom" role={lowerRole} />
+            </div>
+
+            <footer className="mt-7 border-t border-stone-200 pt-4 text-center">
+                <p className="font-song text-lg font-semibold tracking-[0.1em] text-stone-800">
+                    {hexagram.name}
+                </p>
+                <p className="mt-1 font-ui-cn text-[11px] tracking-[0.08em] text-stone-400">
+                    上属{hexagram.upper.wuxing} · 下属{hexagram.lower.wuxing}
+                </p>
+            </footer>
+
+            {!isLast && (
+                <span
+                    aria-hidden="true"
+                    className="absolute -bottom-3 left-1/2 z-10 grid size-6 -translate-x-1/2 place-items-center bg-[#fdfbf7] font-ui-cn text-sm text-[var(--cinnabar)] md:-right-3 md:bottom-auto md:left-auto md:top-1/2 md:-translate-y-1/2 md:translate-x-0"
+                >
+                    <span className="md:hidden">↓</span>
+                    <span className="hidden md:inline">→</span>
+                </span>
+            )}
+        </article>
+    );
+}
+
+function getLunarSeason(month: number): "春" | "夏" | "秋" | "冬" | "未知" {
+    const normalizedMonth = Math.abs(month);
+    if (normalizedMonth >= 1 && normalizedMonth <= 3) return "春";
+    if (normalizedMonth >= 4 && normalizedMonth <= 6) return "夏";
+    if (normalizedMonth >= 7 && normalizedMonth <= 9) return "秋";
+    if (normalizedMonth >= 10 && normalizedMonth <= 12) return "冬";
+    return "未知";
+}
+
+interface HexagramDisplayProps {
+    result: DivinationResult;
+    question: string;
+    requestContext: DivinationRequestContext;
+    onReset: () => void;
+}
+
+export default function HexagramDisplay({ result, question, requestContext, onReset }: HexagramDisplayProps) {
     const [interpretation, setInterpretation] = useState("");
     const [isLoading, setIsLoading] = useState(false);
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -44,92 +160,63 @@ export default function HexagramDisplay({ result, question, onReset, onInterpret
             return;
         }
 
-        const apiKey = localStorage.getItem("meihua_api_key");
-        const baseUrl = localStorage.getItem("meihua_api_base_url") || "";
-        const model = localStorage.getItem("meihua_api_model") || "";
-
         setIsLoading(true);
-        setIsModalOpen(true); // Open modal immediately to show animation
+        setIsModalOpen(true);
         setError("");
         setInterpretation("");
 
         try {
-            const meta = result.meta;
-            const lunar = meta?.lunar;
-            const rawNumbers = meta?.rawNumbers;
-            const wuxingRelation = result.wuxingRelation;
+            // 解读必须使用起卦时刻，不能在用户点击“解卦”时重新取当前时间。
+            const generatedAt = new Date(requestContext.generatedAt);
+            const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || "local";
+            const lunar = Lunar.fromDate(generatedAt);
+            const lunarMonth = lunar.getMonth();
+            const lunarDay = lunar.getDay();
+            const lunarSeason = getLunarSeason(lunarMonth);
+            const aiConfig = getCustomAiConfig();
 
-            const prompt = `
-所问之事：${question || "未指定（请进行通用运势解读）"}
-
-【程序计算结果｜事实，不得重算或替换】
-以下内容均为程序已经计算出的事实。你只能解释这些结果，不得重新起卦、不得改动体卦/用卦/五行/体用关系/起卦时间/动爻，也不得用自己的算法替换。
-
-【程序计算结果｜时间信息】
-起卦方式：${meta?.method || "旧记录未保存"}
-公历时间：${meta?.timeText || "旧记录未保存"}（时区：${meta?.timeZone || "旧记录未保存"}）
-起卦时间戳：${meta?.generatedAt || "旧记录未保存"}
-农历日期：${lunar ? `${lunar.month}月${lunar.day}日` : "旧记录未保存"}
-农历干支：${lunar ? `${lunar.yearGanZhi || "未知"}年 ${lunar.monthGanZhi || "未知"}月 ${lunar.dayGanZhi || "未知"}日 ${lunar.timeGanZhi || "未知"}时` : "旧记录未保存"}
-农历季节：${lunar?.season || "旧记录未保存"}
-农历季节口径：${lunar?.seasonRule || "旧记录未保存"}
-原始数字：上卦数=${rawNumbers?.num1 ?? "旧记录未保存"}，下卦数=${rawNumbers?.num2 ?? "旧记录未保存"}，动爻数=${rawNumbers?.num3 ?? "旧记录未保存"}，最终动爻=${rawNumbers?.movingLine ?? result.movingLine}
-
-【程序计算结果｜卦象数据】
-本卦：${result.main.name}（第${result.main.info.sequence}卦，${result.main.info.judgment}；上卦${result.main.upper.name}/${result.main.upper.nature}/五行${result.main.upper.wuxing}，下卦${result.main.lower.name}/${result.main.lower.nature}/五行${result.main.lower.wuxing}）
-互卦：${result.mutual.name}（第${result.mutual.info.sequence}卦，${result.mutual.info.judgment}；上卦${result.mutual.upper.name}/${result.mutual.upper.nature}/五行${result.mutual.upper.wuxing}，下卦${result.mutual.lower.name}/${result.mutual.lower.nature}/五行${result.mutual.lower.wuxing}）
-变卦：${result.changed.name}（第${result.changed.info.sequence}卦，${result.changed.info.judgment}；上卦${result.changed.upper.name}/${result.changed.upper.nature}/五行${result.changed.upper.wuxing}，下卦${result.changed.lower.name}/${result.changed.lower.nature}/五行${result.changed.lower.wuxing}）
-动爻：第${result.movingLine}爻
-
-【程序计算结果｜体用分析】
-体卦（自己/求测者）：${result.tiTrigram?.name || "旧记录未保存"}（五行属${result.tiWuxing || "旧记录未保存"}）
-用卦（事物/所问对象）：${result.yongTrigram?.name || "旧记录未保存"}（五行属${result.yongWuxing || "旧记录未保存"}）
-体用关系参考：${wuxingRelation ? `${wuxingRelation.label}（${wuxingRelation.description}）。此项只作为体用五行的基础倾向参考，最终仍须结合本卦、互卦、变卦、动爻与所问之事综合判断。` : "旧记录未保存。若体卦、用卦、五行仍已给出，可只按已给事实谨慎说明；不得自行重算体用关系或替换既有体用。"}
-
-【解读规则】
-1. 程序计算结果优先。你只解释，不重算；不能推翻或替换上述体卦、用卦、五行、体用关系、起卦时间、动爻。
-2. 五行体用关系只代表基础倾向，不是最终结论。最终解读必须结合本卦、互卦、变卦、动爻和所问之事；不得使用“程序定性为”“依程序初判”“不易之准绳”等机械表述。
-3. 解读优先级必须按此顺序展开：体用五行 -> 本卦现状 -> 互卦过程/隐情 -> 变卦趋势 -> 动爻 -> 针对所问事项给建议。
-4. 必须围绕所问之事，少空话，明确说明成败倾向、主要阻力、较合适的时机、可执行的行动建议。
-5. 程序已经提供标准六十四卦名与卦序，必须使用这些卦名（如“水天需”“天水讼”），不得自行按上下卦组合另造“坎乾卦”“乾坎卦”等名称。
-6. 若时间、农历、meta 或体用关系为“旧记录未保存”，只能说明信息缺失并基于已给事实谨慎解释，不得改用当前时间重新计算。
-`;
-
-            // Use stream: false for buffering on server/client side (simpler for this requirement)
-            const response = await fetch("/api/interpret", {
+            const data = await fetchApi<{ recordId: string; interpretation: string }>("/api/interpret", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ prompt, apiKey, baseUrl, model, stream: false }),
+                body: JSON.stringify({
+                    clientRequestId: requestContext.clientRequestId,
+                    question: requestContext.question,
+                    method: requestContext.method,
+                    numbers: requestContext.numbers,
+                    timeContext: {
+                        occurredAt: generatedAt.toISOString(),
+                        timeZone,
+                        lunarMonth,
+                        lunarDay,
+                        season: lunarSeason,
+                    },
+                    aiConfig: aiConfig || undefined,
+                }),
             });
-
-            if (!response.ok) {
-                const data = await response.json();
-                throw new Error(data.error || "解读失败");
-            }
-
-            const data = await response.json();
-            const fullInterpretation = data.choices?.[0]?.message?.content || "";
+            const fullInterpretation = data.interpretation;
 
             setInterpretation(fullInterpretation);
-
-            if (onInterpretationComplete) {
-                onInterpretationComplete(fullInterpretation);
-            }
-
-        } catch (err: unknown) {
-            const message = err instanceof Error ? err.message : "未知错误";
-            setError(message || "发生未知错误");
-            // Keep modal open but maybe show error state inside? 
-            // For now, we might want to close it or show error in it.
-            // Let's set interpretation to error message for simplicity in this version
-            setInterpretation(`解读出错: ${message || "未知错误"}`);
+            saveHistoryRecord({
+                id: data.recordId,
+                createdAt: new Date().toISOString(),
+                question,
+                result,
+                interpretation: fullInterpretation,
+            });
+        } catch (caughtError: unknown) {
+            const message = caughtError instanceof Error ? caughtError.message : "发生未知错误";
+            setError(message);
+            setIsModalOpen(false);
         } finally {
             setIsLoading(false);
         }
     };
 
     return (
-        <div className="w-full max-w-4xl mx-auto space-y-6 animate-in fade-in duration-700">
+        <section
+            aria-labelledby="hexagram-result-title"
+            className="mx-auto w-full max-w-5xl space-y-7"
+        >
             <InterpretationModal
                 open={isModalOpen}
                 onOpenChange={setIsModalOpen}
@@ -138,102 +225,77 @@ export default function HexagramDisplay({ result, question, onReset, onInterpret
                 question={question}
             />
 
-            {/* Question Display */}
+            {/* 问题独立成题，避免与卦盘争夺视觉焦点。 */}
             {question && (
-                <div className="text-center animate-in fade-in slide-in-from-bottom-4 duration-700">
-                    <h2 className="text-xl font-serif text-stone-600 mb-2">所问之事</h2>
-                    <p className="text-2xl font-serif font-bold text-stone-800">{question}</p>
-                </div>
+                <header className="border-l-2 border-[var(--cinnabar)] px-4 py-1 sm:px-6">
+                    <p className="font-ui-cn text-[10px] font-medium tracking-[0.26em] text-[var(--cinnabar)]">所问之事</p>
+                    <h2 id="hexagram-result-title" className="mt-3 max-w-3xl break-words font-song text-2xl font-semibold leading-relaxed tracking-[0.06em] text-stone-900 sm:text-3xl">
+                        {question}
+                    </h2>
+                </header>
             )}
 
-            {/* Hexagrams Grid */}
-            <div className="grid grid-cols-3 gap-2 md:gap-3 p-2 bg-white/50 backdrop-blur-sm rounded-xl border border-stone-200 shadow-xl shadow-stone-200/50">
-                <div className="flex flex-col items-center animate-in zoom-in-95 duration-700 delay-100 fill-mode-both">
-                    <h3 className="text-stone-800 font-serif mb-2 text-sm md:text-base">本卦</h3>
-                    <div className="flex flex-col bg-white p-2 rounded-lg shadow-sm border border-stone-100 relative">
-                        {/* Ti/Yong Indicators for Main Hexagram */}
-                        {result.tiTrigram && (
-                            <>
-                                <div className={cn(
-                                    "absolute -left-6 text-[10px] font-serif px-1.5 py-0.5 rounded text-white",
-                                    result.main.upper.id === result.tiTrigram.id && result.movingLine <= 3 ? "top-3 bg-stone-600" :
-                                        result.main.lower.id === result.tiTrigram.id && result.movingLine > 3 ? "bottom-3 bg-stone-600" : "hidden"
-                                )}>
-                                    体
-                                </div>
-                                <div className={cn(
-                                    "absolute -left-6 text-[10px] font-serif px-1.5 py-0.5 rounded text-white",
-                                    result.main.upper.id === result.yongTrigram.id && result.movingLine > 3 ? "top-3 bg-stone-400" :
-                                        result.main.lower.id === result.yongTrigram.id && result.movingLine <= 3 ? "bottom-3 bg-stone-400" : "hidden"
-                                )}>
-                                    用
-                                </div>
-                            </>
-                        )}
-                        <Trigram lines={result.main.upper.lines} name={result.main.upper.name} position="top" />
-                        <Trigram lines={result.main.lower.lines} name={result.main.lower.name} position="bottom" />
-                    </div>
-                    <p className="mt-2 text-stone-600 font-serif text-base">
-                        {result.main.name}
-                        <span className="text-[10px] text-stone-400 ml-1 block text-center">
-                            (上{result.main.upper.wuxing}/下{result.main.lower.wuxing})
-                        </span>
-                    </p>
-                </div>
-
-                <div className="flex flex-col items-center animate-in zoom-in-95 duration-700 delay-300 fill-mode-both">
-                    <h3 className="text-stone-800 font-serif mb-2 text-sm md:text-base">互卦</h3>
-                    <div className="flex flex-col bg-white p-2 rounded-lg shadow-sm border border-stone-100 opacity-70">
-                        <Trigram lines={result.mutual.upper.lines} name={result.mutual.upper.name} position="top" />
-                        <Trigram lines={result.mutual.lower.lines} name={result.mutual.lower.name} position="bottom" />
-                    </div>
-                    <p className="mt-2 text-stone-600 font-serif text-base">
-                        {result.mutual.name}
-                        <span className="text-[10px] text-stone-400 ml-1 block text-center">
-                            (上{result.mutual.upper.wuxing}/下{result.mutual.lower.wuxing})
-                        </span>
-                    </p>
-                </div>
-
-                <div className="flex flex-col items-center animate-in zoom-in-95 duration-700 delay-500 fill-mode-both">
-                    <h3 className="text-stone-800 font-serif mb-2 text-sm md:text-base">变卦</h3>
-                    <div className="flex flex-col bg-white p-2 rounded-lg shadow-sm border border-stone-100">
-                        <Trigram lines={result.changed.upper.lines} name={result.changed.upper.name} position="top" />
-                        <Trigram lines={result.changed.lower.lines} name={result.changed.lower.name} position="bottom" />
-                    </div>
-                    <p className="mt-2 text-stone-600 font-serif text-base">
-                        {result.changed.name}
-                        <span className="text-[10px] text-stone-400 ml-1 block text-center">
-                            (上{result.changed.upper.wuxing}/下{result.changed.lower.wuxing})
-                        </span>
-                    </p>
-                </div>
+            {/* 一块连续纸面承载三阶段，移动端纵向阅读，桌面端横向推演。 */}
+            <div className="grid grid-cols-1 overflow-hidden border-y border-border bg-card/55 md:grid-cols-3">
+                <HexagramStage
+                    sequence="一"
+                    title="本卦"
+                    phase="本象"
+                    hexagram={result.main}
+                    upperRole={result.movingLine <= 3 ? "体" : "用"}
+                    lowerRole={result.movingLine <= 3 ? "用" : "体"}
+                    movingLine={result.movingLine}
+                />
+                <HexagramStage
+                    sequence="二"
+                    title="互卦"
+                    phase="中势"
+                    hexagram={result.mutual}
+                />
+                <HexagramStage
+                    sequence="三"
+                    title="变卦"
+                    phase="之变"
+                    hexagram={result.changed}
+                    isLast
+                />
             </div>
 
-            {/* Action Buttons */}
-            <div className="flex flex-col items-center gap-4 mt-6 md:mt-12">
-                <div className="flex items-center gap-4">
+            {/* 主操作使用朱砂实色，次操作退为描边，保持明确层级。 */}
+            <div className="flex flex-col gap-3 border-t border-stone-200 pt-6 sm:flex-row sm:items-center sm:justify-between">
+                <p className="font-ui-cn text-xs leading-6 text-stone-500">
+                    <span className="mr-3 inline-flex items-center gap-1.5"><span aria-hidden="true" className="size-2 bg-stone-800" />体为自身</span>
+                    <span className="inline-flex items-center gap-1.5"><span aria-hidden="true" className="size-2 border border-[var(--cinnabar)]" />用为所问</span>
+                </p>
+                <div className="grid grid-cols-2 gap-2 sm:flex sm:items-center">
                     <button
+                        type="button"
                         onClick={handleInterpret}
-                        className="flex items-center gap-2 px-8 py-3 bg-stone-800 hover:bg-stone-700 text-white rounded-full shadow-lg hover:shadow-stone-800/20 transition-all duration-300 group animate-in fade-in slide-in-from-bottom-4 duration-700 delay-700 fill-mode-both"
+                        disabled={isLoading}
+                        className="group inline-flex min-h-11 items-center justify-center gap-2 rounded-sm bg-[var(--cinnabar)] px-5 font-ui-cn text-sm font-medium tracking-[0.08em] text-white shadow-[0_8px_22px_-14px_rgba(80,35,35,0.85)] transition-[transform,background-color,box-shadow] duration-200 hover:bg-[#743434] hover:shadow-[0_10px_26px_-14px_rgba(80,35,35,0.95)] active:translate-y-px focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--cinnabar)]/45 focus-visible:ring-offset-2 focus-visible:ring-offset-[#fdfbf7] disabled:cursor-not-allowed disabled:opacity-55"
                     >
-                        <Sparkles className="w-4 h-4 group-hover:animate-pulse" />
-                        <span>{interpretation ? "查看解读" : "解卦"}</span>
+                        <CircleDot className="size-4" aria-hidden="true" />
+                        <span>{isLoading ? "推演中……" : interpretation ? "查看解读" : "解卦"}</span>
                     </button>
                     <button
+                        type="button"
                         onClick={onReset}
-                        className="flex items-center gap-2 px-8 py-3 bg-stone-800 hover:bg-stone-700 text-white rounded-full shadow-lg hover:shadow-stone-800/20 transition-all duration-300 group animate-in fade-in slide-in-from-bottom-4 duration-700 delay-700 fill-mode-both"
+                        className="inline-flex min-h-11 items-center justify-center rounded-sm border border-stone-300 bg-transparent px-5 font-ui-cn text-sm font-medium tracking-[0.08em] text-stone-700 transition-[transform,border-color,background-color,color] duration-200 hover:border-stone-500 hover:bg-stone-100/70 hover:text-stone-900 active:translate-y-px focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-stone-500/35 focus-visible:ring-offset-2 focus-visible:ring-offset-[#fdfbf7]"
                     >
-                        <span>重新起卦</span>
+                        <RotateCcw className="size-4" aria-hidden="true" />
+                        重新起卦
                     </button>
                 </div>
-
-                {error && !isModalOpen && (
-                    <div className="text-red-500 bg-red-50 px-4 py-2 rounded-lg text-sm border border-red-100">
-                        {error}
-                    </div>
-                )}
             </div>
-        </div>
+
+            {error && !isModalOpen && (
+                <div role="alert" aria-live="assertive" className="border-l-2 border-[var(--cinnabar)] bg-[var(--cinnabar)]/[0.04] px-4 py-3 font-ui-cn text-sm leading-6 text-[var(--cinnabar)]">
+                    <p className="font-medium">解读未完成</p>
+                    <p className="mt-0.5 text-xs opacity-85">
+                        {error}
+                    </p>
+                </div>
+            )}
+        </section>
     );
 }

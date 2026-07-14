@@ -2,6 +2,7 @@
 
 import useSWR from 'swr';
 import { Users, FileText, Calendar, TrendingUp } from 'lucide-react';
+import { fetchApi } from '@/lib/api-client';
 
 interface Stats {
     totalUsers: number;
@@ -10,7 +11,7 @@ interface Stats {
     enabled: boolean;
 }
 
-const fetcher = (url: string) => fetch(url).then(res => res.json());
+const fetcher = (url: string) => fetchApi<Stats>(url);
 
 export default function AdminDashboard() {
     const { data: stats, isLoading } = useSWR<Stats>('/api/stats', fetcher, {

@@ -1,136 +1,159 @@
-# 梅花易数 - AI 智能解卦系统
+# 梅花易数 AI 解读
 
-基于 Next.js 构建的现代化梅花易数解卦应用，结合 AI 大模型提供深度卦象解析。
+基于 Next.js 16、PostgreSQL 与 OpenAI 兼容接口构建，面向 Vercel Hobby
+部署。项目提供三种起卦方式、AI 解读、本地历史记录和管理员后台。
 
-## ✨ 特性
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Flink0518%2Fmhys&env=OPENAI_API_KEY,OPENAI_BASE_URL,OPENAI_MODEL,DATABASE_URL,ANONYMOUS_SESSION_SECRET,ADMIN_PASSWORD,ADMIN_SESSION_SECRET&envDescription=%E9%83%A8%E7%BD%B2%E5%89%8D%E8%AF%B7%E5%85%88%E5%AE%8C%E6%88%90%E6%95%B0%E6%8D%AE%E5%BA%93%E8%BF%81%E7%A7%BB%EF%BC%8C%E4%B8%A4%E4%B8%AA%20Session%20Secret%20%E5%BF%85%E9%A1%BB%E4%B8%8D%E5%90%8C&envLink=https%3A%2F%2Fgithub.com%2Flink0518%2Fmhys%23vercel-%E4%B8%80%E9%94%AE%E9%83%A8%E7%BD%B2&project-name=meihua-yishu&repository-name=meihua-yishu)
 
-- 🎯 **传统梅花易数起卦算法** - 忠实还原古法起卦
-- 🤖 **AI 智能解卦** - 支持 OpenAI、DeepSeek 等多种大模型
-- 🎨 **优雅中国风界面** - 精心设计的视觉体验
-- 📱 **响应式布局** - 完美支持桌面端和移动端
-- 💾 **数据持久化** - 支持本地存储或 PostgreSQL 数据库
-- 🔐 **管理后台** - 可选的后台管理面板，查看统计和记录
-- ⚡ **高性能架构** - 基于 Next.js 14+ 构建
+## 功能
 
-## 🚀 快速开始
+- 手动、随机、时间三种起卦方式
+- 服务端计算卦象并构造固定提示词
+- 默认使用站点配置的 OpenAI 兼容服务
+- 用户可在前台设置自己的 OpenAI 兼容 API
+- 自定义 API 地址、API Key、模型仅保存在当前浏览器
+- 前台历史记录仅保存在当前浏览器，最多 50 条
+- 数据库记录仅管理员后台可查看
+- AI 用户、IP、全局限流与请求幂等
+- 管理员登录、统计面板、记录查询与删除
 
-### 本地开发
+## 数据边界
 
-```bash
-# 克隆项目
-git clone <your-repo-url>
-cd meihua-yishu
+```text
+浏览器
+├─ 起卦参数 ────────────────> /api/interpret
+├─ 自定义 API 配置 ─────────> 仅随单次请求临时传输
+├─ 前台历史 ────────────────> localStorage
+└─ 管理后台 ────────────────> /api/admin/*
 
-# 安装依赖
-npm install
+服务端
+├─ 重新计算卦象 / 限流 / 幂等
+├─ 调用默认或用户自定义 OpenAI 兼容接口
+└─ 保存问题、卦象和解读结果供管理员审计
+```
 
-# 配置环境变量
-cp .env.example .env.local
+数据库不会保存用户自定义 API 的地址、API Key 或模型名称。自定义 API 地址必须
+使用标准 HTTPS，且不能指向本机、内网或保留地址。
 
-# 启动开发服务器
+## 技术要求
+
+- Node.js 22.x
+- npm
+- PostgreSQL
+- 支持 `POST /chat/completions` 的 OpenAI 兼容服务
+
+## 本地开发
+
+```powershell
+npm ci
+Copy-Item ".env.example" ".env.local"
 npm run dev
 ```
 
-打开浏览器访问 [http://localhost:3000](http://localhost:3000)
+执行迁移前，需要在当前终端设置 `DIRECT_DATABASE_URL`。Windows PowerShell
+示例：
 
-### 部署到 Vercel
-
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/your-username/meihua-yishu)
-
-1. 推送代码到 GitHub
-2. 在 [Vercel](https://vercel.com/new) 导入项目
-3. 配置环境变量
-4. 点击部署
-
-## 🔧 环境变量配置
-
-### 基础配置（必填）
-
-| 变量名 | 必填 | 说明 | 示例值 |
-|--------|------|------|--------|
-| `OPENAI_API_KEY` | ✅ | AI API 密钥 | `sk-xxxxxxxx` |
-| `OPENAI_BASE_URL` | ❌ | API 基础地址 | `https://api.openai.com/v1` |
-| `OPENAI_MODEL` | ❌ | 使用的模型 | `gpt-3.5-turbo` |
-
-### 数据库配置（可选）
-
-启用数据库后，将解锁管理后台功能，可查看用户统计和占卜记录。
-
-| 变量名 | 说明 |
-|--------|------|
-| `DATABASE_URL` | PostgreSQL 连接字符串（推荐 Supabase） |
-| `ADMIN_PASSWORD` | 管理后台登录密码 |
-| `ADMIN_SESSION_SECRET` | Session 加密密钥（至少 32 字符） |
-
-> **提示**：如不配置数据库，数据将存储在用户浏览器的 localStorage 中。
-
-### 配置示例
-
-**使用 OpenAI**
-```env
-OPENAI_API_KEY=sk-your-openai-api-key
-OPENAI_BASE_URL=https://api.openai.com/v1
-OPENAI_MODEL=gpt-4
+```powershell
+$env:DIRECT_DATABASE_URL="postgresql://..."
+npm run db:migrate
+Remove-Item Env:DIRECT_DATABASE_URL
 ```
 
-**使用 DeepSeek**
-```env
-OPENAI_API_KEY=your-deepseek-api-key
-OPENAI_BASE_URL=https://api.deepseek.com/v1
-OPENAI_MODEL=deepseek-chat
+迁移会修改目标数据库结构，请先确认连接指向正确的数据库。
+
+## 环境变量
+
+### 必填
+
+| 变量 | 说明 |
+| --- | --- |
+| `OPENAI_API_KEY` | 站点默认 AI 服务的 API Key |
+| `OPENAI_BASE_URL` | OpenAI 兼容 API 地址，例如 `https://api.deepseek.com` |
+| `OPENAI_MODEL` | 默认模型名称 |
+| `DATABASE_URL` | 应用运行时 PostgreSQL 连接 |
+| `ANONYMOUS_SESSION_SECRET` | 匿名会话签名密钥，至少 32 字符 |
+| `ADMIN_PASSWORD` | 后台管理员密码，至少 7 个字符 |
+| `ADMIN_SESSION_SECRET` | 管理员会话签名密钥，至少 32 字符 |
+
+`ANONYMOUS_SESSION_SECRET` 和 `ADMIN_SESSION_SECRET` 必须使用两个不同的随机值。
+
+### 仅迁移使用
+
+| 变量 | 说明 |
+| --- | --- |
+| `DIRECT_DATABASE_URL` | Session Pooler 或 Direct Connection，不要暴露给前端 |
+
+### 可选
+
+| 变量 | 默认值 |
+| --- | --- |
+| `SITE_TITLE` | `梅花易数` |
+| `AI_USER_LIMIT_PER_10_MINUTES` | `5` |
+| `AI_USER_DAILY_LIMIT` | `20` |
+| `AI_IP_LIMIT_PER_10_MINUTES` | `20` |
+| `AI_GLOBAL_DAILY_LIMIT` | `500` |
+
+## Supabase 连接说明
+
+- 现有 Session Pooler `5432` 可以继续作为 `DATABASE_URL` 使用。
+- Vercel 高并发场景更推荐 Transaction Pooler `6543`。
+- 项目已关闭预处理语句，并将单实例数据库连接数限制为 1。
+- `DIRECT_DATABASE_URL` 只用于执行迁移，不需要配置到 Vercel。
+
+## Vercel 一键部署
+
+点击顶部的 **Deploy with Vercel** 按钮后：
+
+1. Vercel 会克隆当前 GitHub 仓库并创建项目。
+2. 按页面提示填写七个必填环境变量。
+3. 保持框架为 Next.js、Node.js 为 22.x。
+4. 点击部署，构建命令会自动使用 `npm ci` 和 `npm run build`。
+
+数据库迁移不会在 Vercel 构建期间自动执行。首次部署前，必须先在本地或受控 CI
+环境运行一次 `npm run db:migrate`。这是为了避免多个 Vercel 构建并发修改数据库。
+
+如果项目已经关联 GitHub，向生产分支（通常是 `main`）推送代码后，Vercel 会
+自动构建并发布新版本。环境变量更新后也需要重新部署才会生效。
+
+## 上线前检查
+
+```powershell
+npm run check-env
+npm run verify
 ```
 
-**启用数据库和管理后台**
-```env
-DATABASE_URL=postgresql://postgres.xxx:[PASSWORD]@pooler.supabase.com:5432/postgres
-ADMIN_PASSWORD=your-secure-password
-ADMIN_SESSION_SECRET=your-random-32-character-secret-key
+验收清单：
+
+- 首页可完成起卦和 AI 解读
+- 默认 AI 与用户自定义 OpenAI 兼容 API 均可调用
+- 自定义 API 配置只存在当前浏览器，数据库中不包含这些字段
+- 前台历史可查看、删除和清空，清除浏览器数据后不会恢复
+- 未登录访问后台业务接口返回 `401`
+- 管理员可以查看统计、分页检索和删除记录
+- AI 超时、上游失败和额度耗尽返回可理解的错误
+- GitHub 推送可触发 Vercel 自动部署
+
+## 常用命令
+
+```powershell
+npm run dev
+npm run check-env
+npm run test:run
+npm run type-check
+npm run lint
+npm run build
+npm run verify
+npm run db:migrate
 ```
 
-## 🛠️ 管理后台
+## 隐私说明
 
-配置数据库后，访问 `/admin` 进入管理后台：
+- 用户问题会发送给所选 AI 服务，并将问题、卦象与解读结果保存到数据库供管理员
+  审计。
+- 前台历史副本与用户自定义 API 配置保存在浏览器 `localStorage`。
+- 用户自定义 API 配置不会写入数据库或应用日志。
+- 自定义 API Key 会随单次解读请求传输到本应用服务端，用于代理调用对应服务，
+  请求结束后不持久化。
 
-- 📊 **统计面板** - 查看用户数量、占卜次数等统计
-- 📝 **记录管理** - 浏览和管理所有占卜记录
-- ⚙️ **系统设置** - 自定义网站标题等配置
-
-## 📚 技术栈
-
-| 类别 | 技术 |
-|------|------|
-| 框架 | Next.js 14+ (App Router) |
-| 语言 | TypeScript |
-| 样式 | Tailwind CSS |
-| UI | Radix UI |
-| 动画 | Framer Motion |
-| 数据库 | PostgreSQL (可选) |
-| AI | OpenAI 兼容 API |
-
-## ⚡ 常用命令
-
-```bash
-npm run dev      # 启动开发服务器
-npm run build    # 构建生产版本
-npm run start    # 运行生产版本
-npm run lint     # 代码检查
-```
-
-## 📖 使用说明
-
-1. 在首页输入你想要占卜的问题
-2. 输入两个数字（或使用随机生成）
-3. 点击"起卦"按钮
-4. 查看卦象和 AI 解析结果
-
-## 🤝 贡献
-
-欢迎提交 Issue 和 Pull Request！
-
-## 📄 许可证
-
-MIT License
-
----
-
-**注意**：本项目仅供娱乐和学习交流使用，请勿过度迷信。
+本项目提供传统文化学习与娱乐解读，不替代医疗、法律、投资或人身安全方面的
+专业意见。

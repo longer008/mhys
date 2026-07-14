@@ -1,74 +1,10 @@
-import postgres from 'postgres';
-
-// 检查数据库配置
-function validateDbConfig() {
-    const dbUrl = process.env.DATABASE_URL;
-
-    if (!dbUrl) {
-        return { enabled: false, error: null };
-    }
-
-    const adminPassword = process.env.ADMIN_PASSWORD;
-    const sessionSecret = process.env.ADMIN_SESSION_SECRET;
-
-    if (!adminPassword) {
-        throw new Error(
-            '❌ DATABASE_URL is set but ADMIN_PASSWORD is missing.\n' +
-            '   Please set ADMIN_PASSWORD in your environment variables.'
-        );
-    }
-
-    if (!sessionSecret) {
-        throw new Error(
-            '❌ DATABASE_URL is set but ADMIN_SESSION_SECRET is missing.\n' +
-            '   Please set ADMIN_SESSION_SECRET in your environment variables.'
-        );
-    }
-
-    if (sessionSecret.length < 32) {
-        throw new Error(
-            '❌ ADMIN_SESSION_SECRET must be at least 32 characters long.'
-        );
-    }
-
-    return { enabled: true, error: null };
-}
-
-// 数据库是否启用
-let _dbEnabled: boolean | null = null;
+import {
+    getDb,
+    isDatabaseConfigured,
+} from '@/server/db/client';
 
 export function isDbEnabled(): boolean {
-    if (_dbEnabled === null) {
-        try {
-            const config = validateDbConfig();
-            _dbEnabled = config.enabled;
-        } catch {
-            _dbEnabled = false;
-        }
-    }
-    return _dbEnabled;
-}
-
-// 创建数据库连接（仅在启用时）
-let _sql: postgres.Sql | null = null;
-let _dbInitialized = false;
-
-export function getDb(): postgres.Sql {
-    if (!isDbEnabled()) {
-        throw new Error('Database is not enabled. Set DATABASE_URL to enable.');
-    }
-
-    if (!_sql) {
-        _sql = postgres(process.env.DATABASE_URL!, {
-            ssl: 'require',
-            max: 10,
-            idle_timeout: 20,
-            connect_timeout: 10,
-            onnotice: () => { },  // 静默 NOTICE 消息
-        });
-    }
-
-    return _sql;
+    return isDatabaseConfigured();
 }
 
 // 数据库类型定义
@@ -84,7 +20,17 @@ export interface DbDivinationRecord {
     question: string | null;
     result: unknown;
     interpretation: string | null;
+    client_request_id: string | null;
+    status: 'pending' | 'completed' | 'failed';
+    input: unknown | null;
+    provider: string | null;
+    model: string | null;
+    latency_ms: number | null;
+    input_tokens: number | null;
+    output_tokens: number | null;
+    error_code: string | null;
     created_at: Date;
+    updated_at: Date;
 }
 
 export interface DbSettings {
@@ -93,68 +39,23 @@ export interface DbSettings {
     updated_at: Date;
 }
 
-// 初始化数据库表（只执行一次）
+// 数据库结构改由 scripts/migrate.mjs 显式迁移，运行时禁止执行 DDL。
 export async function initDatabase(): Promise<void> {
-    if (!isDbEnabled() || _dbInitialized) return;
-    _dbInitialized = true;
-
-    const sql = getDb();
-
-    await sql`
-        CREATE TABLE IF NOT EXISTS users (
-            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-            created_at TIMESTAMPTZ DEFAULT NOW(),
-            last_visit TIMESTAMPTZ DEFAULT NOW()
-        )
-    `;
-
-    await sql`
-        CREATE TABLE IF NOT EXISTS divination_records (
-            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-            user_id UUID REFERENCES users(id) ON DELETE CASCADE,
-            question TEXT,
-            result JSONB NOT NULL,
-            interpretation TEXT,
-            created_at TIMESTAMPTZ DEFAULT NOW()
-        )
-    `;
-
-    await sql`
-        CREATE TABLE IF NOT EXISTS settings (
-            key TEXT PRIMARY KEY,
-            value JSONB NOT NULL,
-            updated_at TIMESTAMPTZ DEFAULT NOW()
-        )
-    `;
-
-    // 创建索引
-    await sql`
-        CREATE INDEX IF NOT EXISTS idx_records_user_id ON divination_records(user_id)
-    `;
-
-    await sql`
-        CREATE INDEX IF NOT EXISTS idx_records_created_at ON divination_records(created_at DESC)
-    `;
+    return;
 }
 
 // 用户操作
 export async function getOrCreateUser(userId: string): Promise<DbUser> {
     const sql = getDb();
 
-    const [existing] = await sql<DbUser[]>`
-        SELECT * FROM users WHERE id = ${userId}
+    const [user] = await sql<DbUser[]>`
+        INSERT INTO users (id, last_visit)
+        VALUES (${userId}, NOW())
+        ON CONFLICT (id) DO UPDATE SET last_visit = NOW()
+        RETURNING *
     `;
 
-    if (existing) {
-        await sql`UPDATE users SET last_visit = NOW() WHERE id = ${userId}`;
-        return existing;
-    }
-
-    const [newUser] = await sql<DbUser[]>`
-        INSERT INTO users (id) VALUES (${userId}) RETURNING *
-    `;
-
-    return newUser;
+    return user;
 }
 
 // 占卜记录操作
@@ -169,7 +70,6 @@ export async function saveDivinationRecord(
     // 确保用户存在
     await getOrCreateUser(userId);
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const [record] = await sql<DbDivinationRecord[]>`
         INSERT INTO divination_records (user_id, question, result, interpretation)
         VALUES (${userId}, ${question}, ${sql.json(result as never)}, ${interpretation})
@@ -294,7 +194,6 @@ export async function getSetting<T>(key: string, defaultValue: T): Promise<T> {
 export async function setSetting<T>(key: string, value: T): Promise<void> {
     const sql = getDb();
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     await sql`
         INSERT INTO settings (key, value, updated_at)
         VALUES (${key}, ${sql.json(value as never)}, NOW())

@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import useSWR from 'swr';
 import { Search, Trash2, ChevronLeft, ChevronRight, Eye } from 'lucide-react';
+import { fetchApi } from '@/lib/api-client';
 
 interface Record {
     id: string;
@@ -24,7 +25,7 @@ interface RecordsResponse {
     totalPages: number;
 }
 
-const fetcher = (url: string) => fetch(url).then(res => res.json());
+const fetcher = (url: string) => fetchApi<RecordsResponse>(url);
 
 export default function AdminRecordsPage() {
     const [search, setSearch] = useState('');
@@ -47,17 +48,14 @@ export default function AdminRecordsPage() {
         if (!confirm('确定要删除这条记录吗？')) return;
 
         try {
-            const res = await fetch('/api/admin/records', {
+            await fetchApi<{ deleted: boolean }>('/api/admin/records', {
                 method: 'DELETE',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ id }),
             });
-
-            if (res.ok) {
-                mutate(); // 重新获取数据
-            }
-        } catch (error) {
-            console.error('Failed to delete record:', error);
+            mutate(); // 重新获取数据
+        } catch (caughtError: unknown) {
+            alert(caughtError instanceof Error ? caughtError.message : '删除记录失败');
         }
     };
 

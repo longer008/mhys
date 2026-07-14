@@ -80,6 +80,7 @@ const TRIGRAMS: Record<number, Trigram> = {
     8: { id: 8, name: "坤", nature: "地", wuxing: "土", lines: [false, false, false] },
 };
 
+// 键格式为“上卦编号-下卦编号”，名称与卦序采用通行的六十四卦顺序。
 const STANDARD_HEXAGRAMS: Record<string, HexagramInfo> = {
     "1-1": { sequence: 1, name: "乾为天", judgment: "乾上乾下" },
     "8-8": { sequence: 2, name: "坤为地", judgment: "坤上坤下" },
@@ -167,7 +168,6 @@ function buildHexagram(upper: Trigram, lower: Trigram, lines = getHexagramLines(
         name: info.name,
     };
 }
-
 function getTrigram(num: number): Trigram {
     const remainder = num % 8;
     return TRIGRAMS[remainder === 0 ? 8 : remainder];

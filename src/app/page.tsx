@@ -1,111 +1,213 @@
 "use client";
 
-import { useState } from "react";
-import { AnimatePresence } from "framer-motion";
+import { useRef, useState } from "react";
+import { AnimatePresence, MotionConfig, motion } from "framer-motion";
 import DivinationForm from "@/components/DivinationForm";
 import HexagramDisplay from "@/components/HexagramDisplay";
 import SettingsDialog from "@/components/SettingsDialog";
-import { calculateHexagrams, type DivinationMethod, type DivinationResult } from "@/lib/meihua";
+import { calculateHexagrams, type DivinationResult } from "@/lib/meihua";
 import { HistoryDialog } from "@/components/HistoryDialog";
-import { saveRecord } from "@/lib/history";
-import { History as HistoryIcon } from "lucide-react";
+import type { DivinationRequestContext, DivinationSubmission } from "@/features/divination/types";
+import { History as HistoryIcon, RotateCcw } from "lucide-react";
 import LoadingScreen from "@/components/LoadingScreen";
+import { cn } from "@/lib/utils";
+
+const HOME_STEPS = [
+  { key: 1, mark: "壹", label: "定所问" },
+  { key: 2, mark: "贰", label: "取三数" },
+  { key: 3, mark: "叁", label: "观卦象" },
+] as const;
 
 export default function Home() {
   const [isLoading, setIsLoading] = useState(true);
   const [showResult, setShowResult] = useState(false);
   const [result, setResult] = useState<DivinationResult | null>(null);
   const [question, setQuestion] = useState("");
+  const [requestContext, setRequestContext] = useState<DivinationRequestContext | null>(null);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
+  const [activeStep, setActiveStep] = useState<1 | 2 | 3>(1);
+  const historyButtonRef = useRef<HTMLButtonElement>(null);
 
-  const handleInterpretationComplete = async (interpretation: string) => {
-    if (result && question) {
-      await saveRecord(question, result, interpretation);
-    }
-  };
-
-  const handleDivinationComplete = (num1: number, num2: number, num3: number, q: string, movingLine?: number, method: DivinationMethod = "manual", generatedAt: Date = new Date()) => {
-    const hexagrams = calculateHexagrams(num1, num2, num3, movingLine, method, generatedAt);
+  const handleDivinationComplete = (submission: DivinationSubmission) => {
+    const { num1, num2, num3, movingLine } = submission.numbers;
+    const generatedAt = new Date(submission.generatedAt);
+    const hexagrams = calculateHexagrams(
+      num1,
+      num2,
+      num3,
+      movingLine,
+      submission.method,
+      generatedAt
+    );
     setResult(hexagrams);
-    setQuestion(q);
+    setQuestion(submission.question);
+    setRequestContext({
+      ...submission,
+      clientRequestId: crypto.randomUUID(),
+    });
+    setActiveStep(3);
     setShowResult(true);
   };
 
+  const handleReset = () => {
+    setShowResult(false);
+    setActiveStep(1);
+  };
+
   return (
-    <main className="flex-1 w-full flex flex-col items-center justify-start pt-24 pb-4 p-4 relative selection:bg-stone-200 selection:text-stone-900 overflow-y-auto">
-      {/* Loading Screen - Highest Priority */}
+    <MotionConfig reducedMotion="user">
+      <main id="main-content" className="frontend-theme frontend-shell relative -mb-16 flex min-h-[calc(100dvh-4rem)] w-full flex-1 flex-col overflow-hidden px-4 pb-24 pt-4 sm:px-6 lg:px-10">
       <AnimatePresence mode="wait">
         {isLoading && (
           <LoadingScreen key="loading" onComplete={() => setIsLoading(false)} />
         )}
       </AnimatePresence>
 
-      {/* Main Content - Only render when not loading */}
       {!isLoading && (
-        <>
-          <SettingsDialog />
-          <button
-            onClick={() => setIsHistoryOpen(true)}
-            className="fixed top-4 right-16 p-2 text-stone-400 hover:text-stone-600 transition-colors z-50"
-            title="历史记录"
-          >
-            <HistoryIcon className="w-6 h-6" />
-          </button>
-          <HistoryDialog open={isHistoryOpen} onOpenChange={setIsHistoryOpen} />
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.36, ease: [0.22, 1, 0.36, 1] }}
+          className="mx-auto flex w-full max-w-[1380px] flex-1 flex-col"
+        >
+          <header className="relative z-30 flex h-14 items-center justify-between border-b border-border/70">
+            <button
+              type="button"
+              onClick={handleReset}
+              className="group flex items-center gap-3 rounded-sm text-left"
+              aria-label="返回起卦首页"
+            >
+              <span className="grid h-8 w-8 place-items-center border border-[var(--cinnabar)]/45 text-xs font-semibold text-[var(--cinnabar)] transition-colors group-hover:bg-[var(--cinnabar)] group-hover:text-white">
+                梅
+              </span>
+              <span className="hidden text-sm font-medium tracking-[0.18em] text-foreground sm:block">梅花易数</span>
+            </button>
 
-          {/* Decorative Background Elements */}
-          <div className="absolute inset-0 z-0 pointer-events-none overflow-hidden">
-            {/* Subtle Ink Wash Circles */}
-            <div className="absolute top-[-10%] left-1/2 -translate-x-1/2 w-[1000px] h-[1000px] bg-stone-100/40 rounded-full blur-[100px]" />
-            <div className="absolute bottom-[-10%] right-[-10%] w-[800px] h-[800px] bg-stone-100/30 rounded-full blur-[80px]" />
+            <nav className="flex items-center gap-1" aria-label="辅助功能">
+              <button
+                ref={historyButtonRef}
+                type="button"
+                onClick={() => setIsHistoryOpen(true)}
+                className="inline-flex h-10 items-center gap-2 rounded-md px-3 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
+                aria-label="历史记录"
+              >
+                <HistoryIcon className="h-4 w-4" aria-hidden="true" />
+                <span className="hidden sm:inline">历史</span>
+              </button>
+              <SettingsDialog />
+            </nav>
+          </header>
 
-            {/* Vertical Chinese Text Decoration (Optional, subtle) */}
-            <div className="hidden md:block absolute top-24 right-12 text-[10rem] font-song text-stone-50 opacity-[0.03] select-none writing-vertical-rl">
-              梅花易数
+          <HistoryDialog
+            open={isHistoryOpen}
+            onOpenChange={setIsHistoryOpen}
+            triggerRef={historyButtonRef}
+          />
+
+          <div className="pointer-events-none absolute inset-0 z-0 overflow-hidden" aria-hidden="true">
+            <div className="absolute bottom-10 right-10 hidden whitespace-nowrap text-[clamp(6rem,11vw,11rem)] font-semibold leading-[0.86] tracking-[-0.08em] text-foreground/[0.025] lg:block">
+              象数
             </div>
           </div>
 
-          <div className="relative z-10 w-full max-w-4xl flex flex-col items-center gap-8">
-            {/* Hero Section */}
-            <div className={`text-center space-y-4 md:space-y-8 transition-all duration-1000 ease-out ${showResult ? 'scale-90 md:scale-75 -translate-y-4 md:-translate-y-12 opacity-80' : 'opacity-100'}`}>
-              <div className="relative inline-block">
-                <h1
-                  onClick={() => setShowResult(false)}
-                  className="text-4xl md:text-8xl font-song font-bold text-stone-800 tracking-widest relative z-10 cursor-pointer hover:opacity-80 transition-opacity"
+          <section
+            className={`relative z-10 grid flex-1 items-start gap-10 pb-8 pt-10 lg:grid-cols-[minmax(0,0.82fr)_minmax(30rem,1fr)] lg:gap-16 lg:pt-16 ${showResult ? "lg:grid-cols-[18rem_minmax(0,1fr)]" : ""}`}
+          >
+            <div className={`max-w-xl transition-all duration-300 ${showResult ? "lg:sticky lg:top-10" : "lg:pt-8"}`}>
+              <div className="mb-7 flex items-center gap-3 text-xs font-medium tracking-[0.28em] text-[var(--cinnabar)]">
+                <span className="h-px w-8 bg-current" />
+                观物取象 · 以数明理
+              </div>
+
+              <h1 className={`font-song font-semibold leading-[0.95] tracking-[-0.055em] text-foreground text-balance transition-[font-size] duration-300 ${showResult ? "text-5xl lg:text-6xl" : "text-[clamp(4rem,9vw,8.5rem)]"}`}>
+                梅花
+                <br />
+                <span className="ml-[0.42em] text-[var(--cinnabar)]">易数</span>
+              </h1>
+
+              <p className={`mt-7 max-w-md text-base leading-8 text-muted-foreground text-pretty ${showResult ? "lg:text-sm lg:leading-7" : "sm:text-lg"}`}>
+                万物皆有数，数中自有应。静心写下所问之事，以三数观其始终变化。
+              </p>
+
+              <div className="mt-8 grid max-w-md grid-cols-3 border-y border-border/75 py-4 text-xs" role="list" aria-label="起卦流程">
+                {HOME_STEPS.map((step) => {
+                  const isActive = activeStep === step.key;
+                  const isComplete = activeStep > step.key;
+
+                  return (
+                    <span
+                      key={step.key}
+                      role="listitem"
+                      aria-current={isActive ? "step" : undefined}
+                      className={cn(
+                        "transition-colors duration-200",
+                        isActive
+                          ? "font-medium text-[var(--cinnabar)]"
+                          : isComplete
+                            ? "text-foreground"
+                            : "text-muted-foreground/70",
+                        step.key === 2 ? "text-center" : step.key === 3 ? "text-right" : ""
+                      )}
+                    >
+                      {step.mark} · {step.label}
+                    </span>
+                  );
+                })}
+              </div>
+
+              {showResult && (
+                <button
+                  type="button"
+                  onClick={handleReset}
+                  className="mt-8 inline-flex items-center gap-2 text-sm font-medium text-muted-foreground transition-colors hover:text-[var(--cinnabar)]"
                 >
-                  梅花易数
-                </h1>
-                {/* Red Seal Decoration */}
-                <div className="absolute -top-4 -right-8 w-16 h-16 border-4 border-red-800/20 rounded-sm rotate-12 flex items-center justify-center opacity-60">
-                  <span className="text-red-900/30 font-serif text-xs">观象</span>
-                </div>
-              </div>
-
-              <div className="flex flex-col items-center gap-4">
-                <div className="h-[1px] w-24 bg-gradient-to-r from-transparent via-stone-300 to-transparent" />
-                <p className="text-lg md:text-xl text-stone-600 max-w-xl mx-auto font-song leading-[2.1]">
-                  万物皆有数,数中藏玄机。<br />
-                  <span className="mt-2 inline-block text-stone-500 text-sm md:text-base font-ui-cn tracking-[0.12em]">观物取象 · 以象定数 · 洞悉天机</span>
-                </p>
-                <div className="h-[1px] w-24 bg-gradient-to-r from-transparent via-stone-300 to-transparent" />
-              </div>
-            </div>
-
-            {/* Interactive Section */}
-            <div className="w-full flex flex-col items-center justify-center min-h-[400px]">
-              {!showResult ? (
-                <div className="w-full max-w-md animate-in fade-in slide-in-from-bottom-8 duration-1000 fill-mode-both">
-                  <DivinationForm onComplete={handleDivinationComplete} />
-                </div>
-              ) : (
-                <div className="w-full animate-in fade-in slide-in-from-bottom-12 duration-1000 fill-mode-both">
-                  {result && <HexagramDisplay result={result} question={question} onReset={() => setShowResult(false)} onInterpretationComplete={handleInterpretationComplete} />}
-                </div>
+                  <RotateCcw className="h-4 w-4" aria-hidden="true" />
+                  返回重新起卦
+                </button>
               )}
             </div>
-          </div>
-        </>
+
+            <div className="w-full min-w-0 self-center">
+              <AnimatePresence mode="wait" initial={false}>
+                {!showResult ? (
+                  <motion.div
+                    key="form"
+                    initial={{ opacity: 0, y: 14 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -8 }}
+                    transition={{ duration: 0.26 }}
+                    className="mx-auto w-full max-w-xl"
+                  >
+                    <DivinationForm
+                      onComplete={handleDivinationComplete}
+                      onStepChange={setActiveStep}
+                    />
+                  </motion.div>
+                ) : (
+                  <motion.div
+                    key="result"
+                    initial={{ opacity: 0, y: 14 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -8 }}
+                    transition={{ duration: 0.28 }}
+                    className="w-full"
+                  >
+                    {result && requestContext && (
+                      <HexagramDisplay
+                        result={result}
+                        question={question}
+                        requestContext={requestContext}
+                        onReset={handleReset}
+                      />
+                    )}
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+          </section>
+        </motion.div>
       )}
-    </main>
+      </main>
+    </MotionConfig>
   );
 }

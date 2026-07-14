@@ -1,33 +1,15 @@
-import { NextResponse } from 'next/server';
-import { isDbEnabled, getStats, initDatabase } from '@/lib/db';
+import { requireAdminSession } from "@/server/auth/admin-request";
+import { getAdminStats } from "@/server/db/admin-repository";
+import { apiFailure, apiSuccess, getRequestId } from "@/server/http/response";
 
-export async function GET() {
+export const runtime = "nodejs";
+
+export async function GET(request: Request) {
+    const requestId = getRequestId(request);
     try {
-        // 检查数据库是否启用
-        if (!isDbEnabled()) {
-            return NextResponse.json({
-                enabled: false,
-                totalUsers: 0,
-                totalDivinations: 0,
-                todayDivinations: 0,
-            });
-        }
-
-        // 初始化数据库表（如果不存在）
-        await initDatabase();
-
-        // 获取统计数据
-        const stats = await getStats();
-
-        return NextResponse.json({
-            enabled: true,
-            ...stats,
-        });
+        await requireAdminSession();
+        return apiSuccess({ enabled: true, ...await getAdminStats() }, requestId);
     } catch (error) {
-        console.error('Get stats error:', error);
-        return NextResponse.json(
-            { error: 'Internal server error' },
-            { status: 500 }
-        );
+        return apiFailure(error, requestId, { route: "/api/stats" });
     }
 }

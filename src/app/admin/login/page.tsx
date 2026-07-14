@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { Lock, Eye, EyeOff } from 'lucide-react';
+import { fetchApi } from '@/lib/api-client';
 
 export default function AdminLoginPage() {
     const [password, setPassword] = useState('');
@@ -16,22 +17,14 @@ export default function AdminLoginPage() {
         setLoading(true);
 
         try {
-            const res = await fetch('/api/admin/auth', {
+            await fetchApi<{ message: string }>('/api/admin/auth', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ password }),
             });
-
-            const data = await res.json();
-
-            if (!res.ok) {
-                setError(data.error || '登录失败');
-                return;
-            }
-
             window.location.replace('/admin');
-        } catch {
-            setError('网络错误，请重试');
+        } catch (caughtError: unknown) {
+            setError(caughtError instanceof Error ? caughtError.message : '网络错误，请重试');
         } finally {
             setLoading(false);
         }

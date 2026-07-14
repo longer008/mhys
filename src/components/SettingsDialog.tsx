@@ -1,126 +1,164 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { Settings, X } from "lucide-react";
+import { useState } from "react";
+import { RotateCcw, Save, Settings } from "lucide-react";
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+    DialogTrigger,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import {
+    clearCustomAiConfig,
+    getCustomAiConfig,
+    saveCustomAiConfig,
+} from "@/lib/ai-settings";
 
 export default function SettingsDialog() {
     const [isOpen, setIsOpen] = useState(false);
     const [baseUrl, setBaseUrl] = useState("");
     const [apiKey, setApiKey] = useState("");
     const [model, setModel] = useState("");
+    const [error, setError] = useState("");
 
-    useEffect(() => {
-        const storedBaseUrl = localStorage.getItem("meihua_api_base_url");
-        const storedApiKey = localStorage.getItem("meihua_api_key");
-        const storedModel = localStorage.getItem("meihua_api_model");
-        if (storedBaseUrl) setBaseUrl(storedBaseUrl);
-        if (storedApiKey) setApiKey(storedApiKey);
-        if (storedModel) setModel(storedModel);
-    }, []);
+    const handleOpenChange = (open: boolean) => {
+        if (open) {
+            const config = getCustomAiConfig();
+            setBaseUrl(config?.baseUrl || "");
+            setApiKey(config?.apiKey || "");
+            setModel(config?.model || "");
+            setError("");
+        }
+        setIsOpen(open);
+    };
 
     const handleSave = () => {
-        localStorage.setItem("meihua_api_base_url", baseUrl);
-        localStorage.setItem("meihua_api_key", apiKey);
-        localStorage.setItem("meihua_api_model", model);
+        const normalizedBaseUrl = baseUrl.trim();
+        const normalizedApiKey = apiKey.trim();
+        const normalizedModel = model.trim();
+
+        if (!normalizedBaseUrl && !normalizedApiKey && !normalizedModel) {
+            clearCustomAiConfig();
+            setIsOpen(false);
+            return;
+        }
+        if (!normalizedBaseUrl || !normalizedApiKey || !normalizedModel) {
+            setError("请完整填写 API 地址、API Key 和模型名称");
+            return;
+        }
+
+        let parsedUrl: URL;
+        try {
+            parsedUrl = new URL(normalizedBaseUrl);
+        } catch {
+            setError("API 地址格式无效");
+            return;
+        }
+        if (parsedUrl.protocol !== "https:") {
+            setError("API 地址必须使用 HTTPS");
+            return;
+        }
+
+        saveCustomAiConfig({
+            baseUrl: normalizedBaseUrl.replace(/\/+$/, ""),
+            apiKey: normalizedApiKey,
+            model: normalizedModel,
+        });
+        setError("");
         setIsOpen(false);
     };
 
     const handleReset = () => {
-        localStorage.removeItem("meihua_api_base_url");
-        localStorage.removeItem("meihua_api_key");
-        localStorage.removeItem("meihua_api_model");
+        clearCustomAiConfig();
         setBaseUrl("");
         setApiKey("");
         setModel("");
-        // Optional: Close dialog or keep open to show it's cleared
-        // setIsOpen(false); 
+        setError("");
     };
 
     return (
-        <>
-            <button
-                onClick={() => setIsOpen(true)}
-                className="fixed top-4 right-4 p-2 text-stone-400 hover:text-stone-600 transition-colors z-50"
-                title="设置 API"
-            >
-                <Settings className="w-6 h-6" />
-            </button>
+        <Dialog open={isOpen} onOpenChange={handleOpenChange}>
+            <DialogTrigger asChild>
+                <button
+                    type="button"
+                    className="inline-flex h-10 items-center gap-2 rounded-md px-3 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
+                    aria-label="API 设置"
+                >
+                    <Settings className="h-4 w-4" aria-hidden="true" />
+                    <span className="hidden sm:inline">设置</span>
+                </button>
+            </DialogTrigger>
 
-            {isOpen && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/20 backdrop-blur-sm animate-in fade-in duration-200">
-                    <div className="w-full max-w-md bg-white rounded-xl shadow-2xl p-6 m-4 animate-in zoom-in-95 duration-200">
-                        <div className="flex justify-between items-center mb-6">
-                            <h3 className="text-lg font-serif font-bold text-stone-800">API 设置</h3>
-                            <button
-                                onClick={() => setIsOpen(false)}
-                                className="text-stone-400 hover:text-stone-600 transition-colors"
-                            >
-                                <X className="w-5 h-5" />
-                            </button>
-                        </div>
+            <DialogContent className="frontend-theme max-w-md">
+                <DialogHeader className="border-b border-border pb-5 pr-10">
+                    <div className="mb-2 text-xs font-medium tracking-[0.2em] text-[var(--cinnabar)]">解读服务</div>
+                    <DialogTitle className="text-2xl">API 设置</DialogTitle>
+                    <DialogDescription>
+                        留空使用站点默认服务。
+                    </DialogDescription>
+                </DialogHeader>
 
-                        <div className="space-y-4">
-                            <div>
-                                <label className="block text-sm font-medium text-stone-600 mb-1">
-                                    API Base URL
-                                </label>
-                                <input
-                                    type="text"
-                                    value={baseUrl}
-                                    onChange={(e) => setBaseUrl(e.target.value)}
-                                    className="w-full bg-stone-50 border border-stone-200 rounded-lg px-3 py-2 text-stone-800 placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-stone-400/50"
-                                    placeholder="https://api.openai.com/v1"
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-stone-600 mb-1">
-                                    API Key
-                                </label>
-                                <input
-                                    type="password"
-                                    value={apiKey}
-                                    onChange={(e) => setApiKey(e.target.value)}
-                                    className="w-full bg-stone-50 border border-stone-200 rounded-lg px-3 py-2 text-stone-800 placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-stone-400/50"
-                                    placeholder="sk-..."
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-stone-600 mb-1">
-                                    Model Name
-                                </label>
-                                <input
-                                    type="text"
-                                    value={model}
-                                    onChange={(e) => setModel(e.target.value)}
-                                    className="w-full bg-stone-50 border border-stone-200 rounded-lg px-3 py-2 text-stone-800 placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-stone-400/50"
-                                    placeholder="gpt-3.5-turbo"
-                                />
-                            </div>
-                        </div>
-
-                        <div className="mt-8 flex justify-end gap-3">
-                            <button
-                                onClick={() => setIsOpen(false)}
-                                className="px-4 py-2 text-sm text-stone-600 hover:bg-stone-100 rounded-lg transition-colors"
-                            >
-                                取消
-                            </button>
-                            <button
-                                onClick={handleReset}
-                                className="px-4 py-2 text-sm text-red-600 hover:bg-red-50 rounded-lg transition-colors border border-red-200"
-                            >
-                                恢复默认
-                            </button>
-                            <button
-                                onClick={handleSave}
-                                className="px-4 py-2 text-sm bg-stone-800 text-white hover:bg-stone-700 rounded-lg transition-colors shadow-lg shadow-stone-800/20"
-                            >
-                                保存配置
-                            </button>
-                        </div>
+                <div className="space-y-5 py-2">
+                    <div className="space-y-2">
+                        <label htmlFor="api-base-url" className="text-sm font-medium text-foreground">
+                            API 地址
+                        </label>
+                        <Input
+                            id="api-base-url"
+                            type="url"
+                            value={baseUrl}
+                            onChange={(event) => setBaseUrl(event.target.value)}
+                            placeholder="https://api.openai.com/v1"
+                            autoComplete="url"
+                        />
+                    </div>
+                    <div className="space-y-2">
+                        <label htmlFor="api-key" className="text-sm font-medium text-foreground">
+                            API Key
+                        </label>
+                        <Input
+                            id="api-key"
+                            type="password"
+                            value={apiKey}
+                            onChange={(event) => setApiKey(event.target.value)}
+                            placeholder="sk-..."
+                            autoComplete="off"
+                        />
+                    </div>
+                    <div className="space-y-2">
+                        <label htmlFor="api-model" className="text-sm font-medium text-foreground">
+                            模型名称
+                        </label>
+                        <Input
+                            id="api-model"
+                            type="text"
+                            value={model}
+                            onChange={(event) => setModel(event.target.value)}
+                            placeholder="gpt-4.1-mini"
+                            autoComplete="off"
+                        />
+                    </div>
+                    <div role="alert" aria-live="polite" className="min-h-5 text-xs text-destructive">
+                        {error}
                     </div>
                 </div>
-            )}
-        </>
+
+                <DialogFooter className="mt-2 gap-2 sm:justify-between sm:space-x-0">
+                    <Button type="button" variant="ghost" onClick={handleReset}>
+                        <RotateCcw aria-hidden="true" />
+                        使用默认
+                    </Button>
+                    <Button type="button" onClick={handleSave}>
+                        <Save aria-hidden="true" />
+                        保存
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
     );
 }
