@@ -2,7 +2,9 @@ import { describe, expect, it } from "vitest";
 import { calculateHexagrams } from "@/lib/meihua";
 import type { InterpretationRequest } from "@/features/interpretation/contracts";
 import {
+    buildInterpretationSystemPrompt,
     buildInterpretationUserPrompt,
+    getInterpretationMaxTokens,
     INTERPRETATION_SYSTEM_PROMPT,
 } from "@/features/interpretation/prompt";
 
@@ -42,5 +44,24 @@ describe("解读提示词", () => {
         expect(prompt).toContain(`体用关系参考：${result.wuxingRelation?.label}`);
         expect(INTERPRETATION_SYSTEM_PROMPT).toContain("第一行必须只写一句断语");
         expect(INTERPRETATION_SYSTEM_PROMPT).toContain("只给三条现实可执行建议");
+    });
+
+    it("根据后台预设约束解读详略与文风", () => {
+        const concise = buildInterpretationSystemPrompt({
+            detailLevel: "concise",
+            tone: "plain",
+        });
+        const detailed = buildInterpretationSystemPrompt({
+            detailLevel: "detailed",
+            tone: "classical",
+        });
+
+        expect(concise).toContain("三百五十至五百五十字");
+        expect(concise).toContain("现代中文");
+        expect(detailed).toContain("九百至一千三百字");
+        expect(detailed).toContain("半文半白");
+        expect(getInterpretationMaxTokens("concise")).toBeLessThan(
+            getInterpretationMaxTokens("detailed")
+        );
     });
 });

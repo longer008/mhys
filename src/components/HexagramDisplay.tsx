@@ -146,9 +146,18 @@ interface HexagramDisplayProps {
     question: string;
     requestContext: DivinationRequestContext;
     onReset: () => void;
+    aiInterpretationEnabled?: boolean;
+    allowCustomAi?: boolean;
 }
 
-export default function HexagramDisplay({ result, question, requestContext, onReset }: HexagramDisplayProps) {
+export default function HexagramDisplay({
+    result,
+    question,
+    requestContext,
+    onReset,
+    aiInterpretationEnabled = true,
+    allowCustomAi = true,
+}: HexagramDisplayProps) {
     const [interpretation, setInterpretation] = useState("");
     const [isLoading, setIsLoading] = useState(false);
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -157,6 +166,10 @@ export default function HexagramDisplay({ result, question, requestContext, onRe
     const handleInterpret = async () => {
         if (interpretation) {
             setIsModalOpen(true);
+            return;
+        }
+        if (!aiInterpretationEnabled) {
+            setError("本站暂未开放 AI 解卦");
             return;
         }
 
@@ -173,7 +186,7 @@ export default function HexagramDisplay({ result, question, requestContext, onRe
             const lunarMonth = lunar.getMonth();
             const lunarDay = lunar.getDay();
             const lunarSeason = getLunarSeason(lunarMonth);
-            const aiConfig = getCustomAiConfig();
+            const aiConfig = allowCustomAi ? getCustomAiConfig() : null;
 
             const data = await fetchApi<{ recordId: string; interpretation: string }>("/api/interpret", {
                 method: "POST",
@@ -271,11 +284,17 @@ export default function HexagramDisplay({ result, question, requestContext, onRe
                     <button
                         type="button"
                         onClick={handleInterpret}
-                        disabled={isLoading}
+                        disabled={isLoading || (!aiInterpretationEnabled && !interpretation)}
                         className="group inline-flex min-h-11 items-center justify-center gap-2 rounded-sm bg-[var(--cinnabar)] px-5 font-ui-cn text-sm font-medium tracking-[0.08em] text-white shadow-[0_8px_22px_-14px_rgba(80,35,35,0.85)] transition-[transform,background-color,box-shadow] duration-200 hover:bg-[#743434] hover:shadow-[0_10px_26px_-14px_rgba(80,35,35,0.95)] active:translate-y-px focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--cinnabar)]/45 focus-visible:ring-offset-2 focus-visible:ring-offset-[#fdfbf7] disabled:cursor-not-allowed disabled:opacity-55"
                     >
                         <CircleDot className="size-4" aria-hidden="true" />
-                        <span>{isLoading ? "推演中……" : interpretation ? "查看解读" : "解卦"}</span>
+                        <span>{isLoading
+                            ? "推演中……"
+                            : interpretation
+                                ? "查看解读"
+                                : aiInterpretationEnabled
+                                    ? "解卦"
+                                    : "解卦暂未开放"}</span>
                     </button>
                     <button
                         type="button"

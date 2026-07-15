@@ -85,13 +85,14 @@ export async function enforceRateLimit(options: {
     keyHash: string;
     limit: number;
     windowSeconds: number;
+    message?: string;
 }): Promise<void> {
     const decision = await consumeRateLimit(options);
     if (!decision.allowed) {
         throw new ApiError(
             429,
             "RATE_LIMITED",
-            "请求过于频繁，请稍后再试",
+            options.message || "请求过于频繁，请稍后再试",
             decision.retryAfterSeconds
         );
     }

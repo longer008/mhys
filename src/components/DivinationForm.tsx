@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { CircleDot, Clock, Minus, Plus, Shuffle } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -12,10 +12,14 @@ import type { DivinationMethod, DivinationSubmission } from "@/features/divinati
 interface DivinationFormProps {
     onComplete: (submission: DivinationSubmission) => void;
     onStepChange?: (step: 1 | 2) => void;
+    enabledMethods?: DivinationMethod[];
+    defaultMethod?: DivinationMethod;
+    maxQuestionLength?: number;
+    noticeText?: string;
 }
 
-const MAX_QUESTION_LENGTH = 500;
 const MAX_DIVINATION_NUMBER = 999_999_999;
+const DEFAULT_METHODS: DivinationMethod[] = ["manual", "random", "time"];
 
 const METHOD_OPTIONS: Array<{ value: DivinationMethod; label: string }> = [
     { value: "manual", label: "一念取数" },
@@ -23,14 +27,35 @@ const METHOD_OPTIONS: Array<{ value: DivinationMethod; label: string }> = [
     { value: "time", label: "依时成卦" },
 ];
 
-export default function DivinationForm({ onComplete, onStepChange }: DivinationFormProps) {
+export default function DivinationForm({
+    onComplete,
+    onStepChange,
+    enabledMethods = DEFAULT_METHODS,
+    defaultMethod = "manual",
+    maxQuestionLength = 500,
+    noticeText = "无事不占 · 不动不占 · 诚心静气",
+}: DivinationFormProps) {
     const [question, setQuestion] = useState("");
     const [num1, setNum1] = useState("");
     const [num2, setNum2] = useState("");
     const [num3, setNum3] = useState("");
-    const [method, setMethod] = useState<DivinationMethod>("manual");
+    const [method, setMethod] = useState<DivinationMethod>(defaultMethod);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [error, setError] = useState("");
+    const previousDefaultMethod = useRef(defaultMethod);
+
+    useEffect(() => {
+        const nextMethod = enabledMethods.includes(defaultMethod)
+            ? defaultMethod
+            : enabledMethods[0] || "manual";
+        const defaultChanged = previousDefaultMethod.current !== defaultMethod;
+        previousDefaultMethod.current = defaultMethod;
+        setMethod((currentMethod) =>
+            defaultChanged || !enabledMethods.includes(currentMethod)
+                ? nextMethod
+                : currentMethod
+        );
+    }, [defaultMethod, enabledMethods]);
 
     const updateNumber = (value: string, setter: (nextValue: string) => void, amount: number) => {
         const currentValue = Number(value);
@@ -52,8 +77,8 @@ export default function DivinationForm({ onComplete, onStepChange }: DivinationF
             setError("请先输入您想问的事情");
             return;
         }
-        if (normalizedQuestion.length > MAX_QUESTION_LENGTH) {
-            setError(`问题不能超过 ${MAX_QUESTION_LENGTH} 个字符`);
+        if (normalizedQuestion.length > maxQuestionLength) {
+            setError(`问题不能超过 ${maxQuestionLength} 个字符`);
             return;
         }
         const numbers = [n1, n2, n3];
@@ -150,7 +175,7 @@ export default function DivinationForm({ onComplete, onStepChange }: DivinationF
                         诚心起卦
                     </h2>
                     <p className="mt-3 font-ui-cn text-sm leading-6 tracking-[0.08em] text-muted-foreground">
-                        无事不占 · 不动不占 · 诚心静气
+                        {noticeText}
                     </p>
                 </div>
                 <span aria-hidden="true" className="mt-1 grid size-10 shrink-0 place-items-center border border-[var(--cinnabar)]/45 font-song text-sm text-[var(--cinnabar)]">
@@ -177,7 +202,7 @@ export default function DivinationForm({ onComplete, onStepChange }: DivinationF
                         aria-invalid={Boolean(error)}
                         aria-describedby={error ? "question-error" : undefined}
                         disabled={isSubmitting}
-                        maxLength={MAX_QUESTION_LENGTH}
+                        maxLength={maxQuestionLength}
                         className={cn(
                             "flex min-h-28 w-full resize-none rounded-sm border bg-card/55 px-4 py-3 font-kai text-lg leading-8 text-foreground outline-none placeholder:text-muted-foreground",
                             "transition-[border-color,box-shadow,background-color] duration-200 focus-visible:border-ring focus-visible:bg-card/80 focus-visible:ring-2 focus-visible:ring-ring/25 focus-visible:ring-offset-2 focus-visible:ring-offset-background",
@@ -187,7 +212,7 @@ export default function DivinationForm({ onComplete, onStepChange }: DivinationF
                         placeholder="心中默念所问之事……"
                     />
                     <div className="flex justify-end font-ui-cn text-[11px] leading-5 text-muted-foreground">
-                        <span className="shrink-0 tabular-nums">{question.length}/{MAX_QUESTION_LENGTH}</span>
+                        <span className="shrink-0 tabular-nums">{question.length}/{maxQuestionLength}</span>
                     </div>
                     <div id="question-error" role="alert" aria-live="polite" className="min-h-5">
                         {error && (
@@ -205,8 +230,18 @@ export default function DivinationForm({ onComplete, onStepChange }: DivinationF
 
                 <fieldset className="space-y-4">
                     <legend className="font-ui-cn text-sm font-medium tracking-[0.08em] text-foreground">起卦方式</legend>
-                    <div className="grid grid-cols-3 gap-1 border border-border/80 bg-muted/45 p-1" aria-label="起卦方式">
-                        {METHOD_OPTIONS.map((option) => {
+                    <div
+                        className={cn(
+                            "grid gap-1 border border-border/80 bg-muted/45 p-1",
+                            enabledMethods.length === 1
+                                ? "grid-cols-1"
+                                : enabledMethods.length === 2
+                                    ? "grid-cols-2"
+                                    : "grid-cols-3"
+                        )}
+                        aria-label="起卦方式"
+                    >
+                        {METHOD_OPTIONS.filter((option) => enabledMethods.includes(option.value)).map((option) => {
                             const isSelected = method === option.value;
 
                             return (

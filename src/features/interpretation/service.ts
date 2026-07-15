@@ -4,9 +4,10 @@ import {
     type InterpretationRequest,
 } from "@/features/interpretation/contracts";
 import {
+    buildInterpretationSystemPrompt,
     buildInterpretationUserPrompt,
+    getInterpretationMaxTokens,
     INTERPRETATION_PROMPT_VERSION,
-    INTERPRETATION_SYSTEM_PROMPT,
 } from "@/features/interpretation/prompt";
 import { requestAiInterpretation } from "@/server/ai/openai-compatible";
 import {
@@ -15,9 +16,7 @@ import {
     failInterpretationRecord,
 } from "@/server/db/divination-repository";
 import {
-    getAiConfig,
     getAnonymousSessionSecret,
-    getRateLimitConfig,
 } from "@/server/config/env";
 import { ApiError, isApiError } from "@/server/http/api-error";
 import { logInfo, logWarn } from "@/server/observability/logger";
@@ -26,12 +25,17 @@ import {
     getRequestIp,
     hashRateLimitKey,
 } from "@/server/security/rate-limit";
+import {
+    getEffectiveAiConfig,
+    getRuntimeSettings,
+} from "@/server/settings/runtime-settings";
+import type { UsageLimitSettings } from "@/features/settings/contracts";
 
 async function enforceAiLimits(
     request: Request,
-    userId: string
+    userId: string,
+    limits: UsageLimitSettings
 ): Promise<void> {
-    const limits = getRateLimitConfig();
     const secret = getAnonymousSessionSecret();
     const ip = getRequestIp(request);
 
@@ -50,6 +54,7 @@ async function enforceAiLimits(
         keyHash: userHash,
         limit: limits.userDaily,
         windowSeconds: 24 * 60 * 60,
+        message: limits.limitMessage,
     });
     await enforceRateLimit({
         scope: "ai_ip_10m",
@@ -62,6 +67,7 @@ async function enforceAiLimits(
         keyHash: globalHash,
         limit: limits.globalDaily,
         windowSeconds: 24 * 60 * 60,
+        message: limits.limitMessage,
     });
 }
 
@@ -72,7 +78,30 @@ export async function interpretDivination(options: {
     input: InterpretationRequest;
 }) {
     const { request, requestId, userId, input } = options;
-    await enforceAiLimits(request, userId);
+    const settings = await getRuntimeSettings();
+
+    if (!settings.divination.aiInterpretationEnabled) {
+        throw new ApiError(503, "AI_DISABLED", "本站暂未开放 AI 解卦");
+    }
+    if (!settings.divination.enabledMethods.includes(input.method)) {
+        throw new ApiError(400, "METHOD_DISABLED", "当前起卦方式已停用");
+    }
+    if (input.question.length > settings.divination.maxQuestionLength) {
+        throw new ApiError(
+            400,
+            "QUESTION_TOO_LONG",
+            `问题不能超过 ${settings.divination.maxQuestionLength} 个字符`
+        );
+    }
+    if (input.aiConfig && !settings.divination.allowCustomAi) {
+        throw new ApiError(
+            403,
+            "CUSTOM_AI_DISABLED",
+            "本站暂不允许使用自定义 AI 服务"
+        );
+    }
+
+    await enforceAiLimits(request, userId, settings.limits);
 
     const result = calculateHexagrams(
         input.numbers.num1,
@@ -83,7 +112,8 @@ export async function interpretDivination(options: {
         new Date(input.timeContext.occurredAt)
     );
     const customAiConfig = input.aiConfig;
-    const aiConfig = customAiConfig || getAiConfig();
+    const resolvedAi = customAiConfig ? null : await getEffectiveAiConfig();
+    const aiConfig = customAiConfig || resolvedAi!.config;
     const persistedInput = toPersistedInterpretationRequest(input);
 
     const pending = await createOrReusePendingRecord({
@@ -109,6 +139,9 @@ export async function interpretDivination(options: {
     }
 
     const userPrompt = buildInterpretationUserPrompt(input, result);
+    const systemPrompt = buildInterpretationSystemPrompt(
+        settings.interpretation
+    );
     logInfo("ai_request_started", {
         requestId,
         recordId: pending.record.id,
@@ -119,9 +152,15 @@ export async function interpretDivination(options: {
 
     try {
         const aiResult = await requestAiInterpretation({
-            systemPrompt: INTERPRETATION_SYSTEM_PROMPT,
+            systemPrompt,
             userPrompt,
-            config: customAiConfig,
+            config:
+                customAiConfig || resolvedAi?.source === "database"
+                    ? aiConfig
+                    : undefined,
+            maxTokens: getInterpretationMaxTokens(
+                settings.interpretation.detailLevel
+            ),
         });
 
         const record = await completeInterpretationRecord({

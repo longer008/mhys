@@ -19,12 +19,14 @@ import {
     saveCustomAiConfig,
 } from "@/lib/ai-settings";
 
-export default function SettingsDialog() {
+export default function SettingsDialog({ allowCustomAi = true }: { allowCustomAi?: boolean }) {
     const [isOpen, setIsOpen] = useState(false);
     const [baseUrl, setBaseUrl] = useState("");
     const [apiKey, setApiKey] = useState("");
     const [model, setModel] = useState("");
     const [error, setError] = useState("");
+
+    if (!allowCustomAi) return null;
 
     const handleOpenChange = (open: boolean) => {
         if (open) {

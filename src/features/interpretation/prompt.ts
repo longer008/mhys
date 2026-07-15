@@ -1,7 +1,8 @@
 import type { InterpretationRequest } from "@/features/interpretation/contracts";
+import type { InterpretationPreferences } from "@/features/settings/contracts";
 import type { DivinationResult } from "@/lib/meihua";
 
-export const INTERPRETATION_PROMPT_VERSION = "2026-07-14-v5";
+export const INTERPRETATION_PROMPT_VERSION = "2026-07-16-v6";
 
 export const INTERPRETATION_SYSTEM_PROMPT = `【角色设定】
 你是一位深研《梅花易数》《皇极经世》与《周易》的传统文化解读者。你的解读古朴而不晦涩，深刻而不敷衍，详尽而不啰嗦，并能将卦象落到现实处境与行动选择。
@@ -39,7 +40,7 @@ export const INTERPRETATION_SYSTEM_PROMPT = `【角色设定】
 必须依次分析体用五行、本卦现状、互卦过程与隐情、变卦趋势、动爻、针对所问事项的建议。每一步都要回扣所问之事，少说泛泛玄谈，多说成败倾向、阻力、时机与行动。
 
 【输出规范】
-- 总字数必须超过七百字，宁可少分点，也要把每段说透。
+- 解读详略和行文风格由末尾的站点偏好决定，不得忽略。
 - 禁止使用 Emoji。
 - 最终正文不得出现中文或英文圆括号、方括号。卦序和补充说明应自然写进句子。
 - 先断后释，先给结论，再讲卦理；语言沉稳、笃定、有人味，半文半白但不堆砌术语。
@@ -70,6 +71,38 @@ export const INTERPRETATION_SYSTEM_PROMPT = `【角色设定】
 1. 当下行动：给出接下来一到两周最该做的一件事和可立即执行的步骤。
 2. 时机选择：说明适合推进、等待或收缩的时间窗口，并给出判断条件。
 3. 避坑取舍：明确最应避免的风险、不可做的事，以及必要时应舍弃什么。`;
+
+const DETAIL_INSTRUCTIONS: Record<
+    InterpretationPreferences["detailLevel"],
+    string
+> = {
+    concise: "使用精简解读，总字数控制在三百五十至五百五十字。保留全部标题，但每节只写最关键的判断，不重复铺陈。",
+    standard: "使用标准解读，总字数控制在六百五十至九百字。各部分完整展开，但避免重复解释同一卦理。",
+    detailed: "使用详尽解读，总字数控制在九百至一千三百字。把体用、三卦、动爻和现实建议讲透，但不得为了凑字数重复内容。",
+};
+
+const TONE_INSTRUCTIONS: Record<InterpretationPreferences["tone"], string> = {
+    plain: "以通俗清楚的现代中文表达，术语出现后立即解释，避免生僻文言和故作玄虚。",
+    classical: "保持古朴沉稳、半文半白的表达，但不得晦涩，不堆砌古语或术语。",
+};
+
+export function buildInterpretationSystemPrompt(
+    preferences: InterpretationPreferences
+): string {
+    return `${INTERPRETATION_SYSTEM_PROMPT}
+
+【站点解读偏好】
+${DETAIL_INSTRUCTIONS[preferences.detailLevel]}
+${TONE_INSTRUCTIONS[preferences.tone]}`;
+}
+
+export function getInterpretationMaxTokens(
+    detailLevel: InterpretationPreferences["detailLevel"]
+): number {
+    if (detailLevel === "concise") return 1_000;
+    if (detailLevel === "standard") return 1_800;
+    return 2_600;
+}
 
 export function buildInterpretationUserPrompt(
     input: InterpretationRequest,

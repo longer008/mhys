@@ -5,9 +5,15 @@ import { useEffect } from "react";
 
 interface LoadingScreenProps {
   onComplete: () => void;
+  siteTitle?: string;
+  tagline?: string;
 }
 
-export default function LoadingScreen({ onComplete }: LoadingScreenProps) {
+export default function LoadingScreen({
+  onComplete,
+  siteTitle = "梅花易数",
+  tagline = "观象授时 · 万物皆数",
+}: LoadingScreenProps) {
   useEffect(() => {
     const minDuration = 520;
     const startTime = Date.now();
@@ -147,10 +153,10 @@ export default function LoadingScreen({ onComplete }: LoadingScreenProps) {
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.12, duration: 0.3 }}
         >
-          <h1 className="ml-2 font-song text-2xl font-semibold tracking-[0.5em] text-foreground sm:text-3xl">梅花易数</h1>
+          <h1 className="max-w-[80vw] break-words text-center font-song text-2xl font-semibold tracking-[0.16em] text-foreground sm:text-3xl">{siteTitle}</h1>
           <div className="flex items-center gap-3 text-[var(--cinnabar)] opacity-75">
             <div className="h-px w-7 bg-current" />
-            <p className="text-[10px] tracking-[0.28em] text-muted-foreground sm:text-xs">观象授时 · 万物皆数</p>
+            <p className="text-[10px] tracking-[0.18em] text-muted-foreground sm:text-xs">{tagline}</p>
             <div className="h-px w-7 bg-current" />
           </div>
         </motion.div>

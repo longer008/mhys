@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import Footer from "@/components/Footer";
-import { getSiteTitle } from "@/server/config/env";
+import { getPublicSiteSettings } from "@/server/settings/runtime-settings";
 
 
 const geistSans = Geist({
@@ -15,13 +15,14 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
-export const metadata: Metadata = {
-  title: `${getSiteTitle()} | 观象占验`,
-  description: "基于梅花易数的在线占卜工具",
-  icons: {
-    icon: "/icon.png",
-  },
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const { site } = await getPublicSiteSettings();
+  return {
+    title: `${site.siteTitle} | 观象占验`,
+    description: site.disclaimerText,
+    icons: { icon: "/icon.png" },
+  };
+}
 
 export default function RootLayout({
   children,

@@ -40,6 +40,9 @@ async function requestCustomProvider(options: {
     config: AiConfig;
     systemPrompt: string;
     userPrompt: string;
+    temperature: number;
+    maxTokens: number;
+    timeoutMs: number;
 }): Promise<{ status: number; payload: unknown }> {
     const target = await resolveSafeOutboundBaseUrl(options.config.baseUrl);
     const requestUrl = new URL("chat/completions", `${target.url.toString().replace(/\/+$/, "")}/`);
@@ -49,8 +52,8 @@ async function requestCustomProvider(options: {
             { role: "system", content: options.systemPrompt },
             { role: "user", content: options.userPrompt },
         ],
-        temperature: 0.7,
-        max_tokens: 1800,
+        temperature: options.temperature,
+        max_tokens: options.maxTokens,
         stream: false,
     });
 
@@ -97,7 +100,7 @@ async function requestCustomProvider(options: {
             });
         });
 
-        request.setTimeout(AI_TIMEOUT_MS, () => {
+        request.setTimeout(options.timeoutMs, () => {
             timedOut = true;
             request.destroy();
         });
@@ -121,8 +124,14 @@ export async function requestAiInterpretation(options: {
     systemPrompt: string;
     userPrompt: string;
     config?: AiConfig;
+    temperature?: number;
+    maxTokens?: number;
+    timeoutMs?: number;
 }): Promise<AiInterpretationResult> {
     const config = options.config || getAiConfig();
+    const temperature = options.temperature ?? 0.7;
+    const maxTokens = options.maxTokens ?? 1800;
+    const timeoutMs = options.timeoutMs ?? AI_TIMEOUT_MS;
     const startedAt = Date.now();
 
     let responseStatus: number;
@@ -133,6 +142,9 @@ export async function requestAiInterpretation(options: {
                 config,
                 systemPrompt: options.systemPrompt,
                 userPrompt: options.userPrompt,
+                temperature,
+                maxTokens,
+                timeoutMs,
             });
             responseStatus = customResponse.status;
             payload = customResponse.payload;
@@ -149,11 +161,11 @@ export async function requestAiInterpretation(options: {
                         { role: "system", content: options.systemPrompt },
                         { role: "user", content: options.userPrompt },
                     ],
-                    temperature: 0.7,
-                    max_tokens: 1800,
+                    temperature,
+                    max_tokens: maxTokens,
                     stream: false,
                 }),
-                signal: AbortSignal.timeout(AI_TIMEOUT_MS),
+                signal: AbortSignal.timeout(timeoutMs),
             });
             responseStatus = response.status;
             payload = await response.json();

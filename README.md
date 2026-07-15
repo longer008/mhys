@@ -16,6 +16,8 @@
 - 数据库记录仅管理员后台可查看
 - AI 用户、IP、全局限流与请求幂等
 - 管理员登录、统计面板、记录查询与删除
+- 后台分组管理站点文案、起卦方式、AI 解读偏好与使用额度
+- 后台管理 OpenAI 兼容服务并测试连接，API Key 加密保存且不回传明文
 
 ## 数据边界
 
@@ -76,6 +78,19 @@ Remove-Item Env:DIRECT_DATABASE_URL
 | `ADMIN_SESSION_SECRET` | 管理员会话签名密钥，至少 32 字符 |
 
 `ANONYMOUS_SESSION_SECRET` 和 `ADMIN_SESSION_SECRET` 必须使用两个不同的随机值。
+
+`ADMIN_SESSION_SECRET` 同时用于派生后台 API Key 的加密密钥。更换该值后，需在后台重新保存一次 API Key。
+
+## 后台设置
+
+后台设置保存在现有 `settings` 表中，保存后立即生效，无需重新部署：
+
+- 站点名称、首页引导语、问卦须知、公告、页脚和免责声明
+- 起卦方式、默认方式、问题字数、AI 解卦和访客自定义 API 开关
+- AI 解读详略、行文风格与解卦使用额度
+- OpenAI 兼容 API 地址、模型和 API Key
+
+后台 API 配置优先于环境变量。恢复 API 服务默认值后，应用重新使用 `OPENAI_BASE_URL`、`OPENAI_MODEL` 和 `OPENAI_API_KEY`。API Key 使用 AES-256-GCM 加密存储，管理接口只返回配置状态，不返回密钥内容。
 
 ### 仅迁移使用
 

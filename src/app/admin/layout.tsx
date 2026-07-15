@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { LayoutDashboard, FileText, Settings, LogOut, Menu, X } from 'lucide-react';
+import { requestAdminNavigation } from '@/lib/admin-navigation-guard';
 import { fetchApi } from '@/lib/api-client';
 
 interface AdminAuthState {
@@ -51,6 +52,8 @@ export default function AdminLayout({
     };
 
     const handleLogout = async () => {
+        if (!requestAdminNavigation()) return;
+
         try {
             await fetchApi<{ success: boolean }>('/api/admin/auth', { method: 'DELETE' });
         } finally {
